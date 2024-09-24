@@ -1,9 +1,8 @@
 library(shiny)
 library(shinydashboard)
 
-# Define UI for the app
 ui <- dashboardPage(
-  dashboardHeader(title = "LoupeBrowserComplementaryAnalyses"),
+  dashboardHeader(title = "cLoupeComplement"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Data Loading", tabName = "data_loading", icon = icon("upload")),
@@ -34,6 +33,18 @@ ui <- dashboardPage(
               ),
               selectizeInput("gene_select", "Select Gene of Interest:",
                              choices = NULL, multiple = FALSE),
+              checkboxInput("show_comparisons", "Show pairwise comparisons", FALSE),
+              conditionalPanel(
+                condition = "input.show_comparisons == true",
+                fluidRow(
+                  column(6, selectizeInput("comparison_select", "Select clusters to compare:",
+                                 choices = NULL, multiple = TRUE, options = list(maxItems = 2))),
+                  column(6, checkboxInput("display_pval", "Show comparisons as pval", FALSE))
+                ),
+                actionButton("add_comparison", "Add Comparison"),
+                actionButton("remove_comparison", "Remove Last Comparison"),
+                verbatimTextOutput("current_comparisons")
+              ),
               plotOutput("violinPlot"),
               plotOutput("beeswarmPlot")
       ),

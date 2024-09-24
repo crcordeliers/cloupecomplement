@@ -17,9 +17,6 @@ loadClusterMat <- function(filenameCluster, seuratObj) {
   barcodes <- colnames(seuratObj[["Spatial"]]$data)
   clusterMat <- clusterMat[clusterMat$Barcode %in% barcodes, ]
   
-  # Print the number of rows in clusterMat after filtering
-  print(paste("Number of rows in clusterMat after filtering:", nrow(clusterMat)))
-  
   return(clusterMat)
 }
 
@@ -52,4 +49,28 @@ create_beeswarm_plot <- function(gene_data, gene) {
     guides(color = guide_legend(override.aes = list(size = 4))) +
     theme_minimal() +
     labs(title = paste("Beeswarm Plot for", gene), x = "Cluster", y = "Expression Level")
+}
+
+create_plot_with_stats <- function(plot_func, gene_data, gene, comparisons, display_pval) {
+  p <- plot_func(gene_data, gene)
+  
+  if (length(comparisons) > 0) {
+    # Toggle label based on display_pval value
+    label_format <- if (display_pval) "p.value" else "p.signif"
+    
+    p <- p + stat_compare_means(comparisons = comparisons, 
+                                method = "wilcox.test",
+                                label = label_format)
+  }
+  
+  p <- p + stat_compare_means(
+    method = "kruskal.test",
+    label.x = 0.5,  
+    label.y = Inf,
+    vjust = 1.2,
+    hjust = 0
+  ) +
+    scale_y_continuous(expand = expand_scale(mult = c(0, 0.15)))
+  
+  return(p)
 }
