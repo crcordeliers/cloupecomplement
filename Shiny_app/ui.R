@@ -6,7 +6,8 @@ ui <- dashboardPage(
   dashboardSidebar(
     sidebarMenu(
       menuItem("Data Loading", tabName = "data_loading", icon = icon("upload")),
-      menuItem("Violin & Beeswarm Plots", tabName = "plots", icon = icon("chart-bar")),
+      menuItem("Violin & Beeswarm Plots", tabName = "plots", icon = icon("chart-simple")),
+      menuItem("Heatmap & Dotplots", tabName = "hmap_dotplot", icon = icon("chart-bar")),
       menuItem("Diffexp", tabName = "diffexp", icon = icon("table")),
       menuItem("Pathway Analysis", tabName = "pathway", icon = icon("dna"))
     )
@@ -47,6 +48,15 @@ ui <- dashboardPage(
               ),
               plotOutput("violinPlot"),
               plotOutput("beeswarmPlot")
+      ),
+      
+      # Heatmap & Dotplot tab
+      tabItem(tabName = "hmap_dotplot",
+              h2("Heatmap & Dotplots"),
+              selectizeInput("gene_select_dotplot", "Select Genes of Interest:",
+                             choices = NULL, multiple = TRUE),
+              plotOutput("heatmap"),
+              plotOutput("dotplot")
       ),
       
       # Diffexp tab (Work in progress)

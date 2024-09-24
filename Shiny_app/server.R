@@ -23,6 +23,7 @@ server <- function(input, output, session) {
     # Sort clusters and update comparison select input
     sorted_clusters <- sort(unique(data_loaded$clusterMat[,2]))  # Sort cluster names
     updateSelectizeInput(session, "gene_select", choices = rownames(data_loaded$seuratObj), server = TRUE)
+    updateSelectizeInput(session, "gene_select_dotplot", choices = rownames(data_loaded$seuratObj), server = TRUE)
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
   })
   
