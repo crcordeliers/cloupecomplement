@@ -16,8 +16,7 @@ server <- function(input, output, session) {
     data_loaded$seuratObj <- loadAndPreprocess(folderCellRangerOut)
     data_loaded$clusterMat <- loadClusterMat(filenameCluster, data_loaded$seuratObj)
     
-    # Sort clusters and update comparison select input
-    sorted_clusters <- sort(unique(data_loaded$clusterMat[,2]))  # Sort cluster names
+    sorted_clusters <- sort(unique(data_loaded$clusterMat[,1]))
     updateSelectizeInput(session, "gene_select", choices = rownames(data_loaded$seuratObj), server = TRUE)
     updateSelectizeInput(session, "gene_select_dotplot", choices = rownames(data_loaded$seuratObj), server = TRUE)
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)

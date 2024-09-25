@@ -11,11 +11,13 @@ loadAndPreprocess <- function(folderCellRangerOut){
 }
 
 loadClusterMat <- function(filenameCluster, seuratObj) {
-  clusterMat <- read.csv2(filenameCluster, sep = ",")
+  clusterMat <- read.csv2(filenameCluster, sep = ",", row.names = 1)
   
-  # Ensure alignment between barcodes in clusterMat and seuratObj
   barcodes <- colnames(seuratObj[["Spatial"]]$data)
-  clusterMat <- clusterMat[clusterMat$Barcode %in% barcodes, ]
+  
+  common_barcodes <- intersect(barcodes, rownames(clusterMat))
+  clusterMat <- clusterMat[common_barcodes, , drop = FALSE]
+  clusterMat <- clusterMat[match(barcodes, rownames(clusterMat)), , drop = FALSE]
   
   return(clusterMat)
 }
@@ -27,7 +29,7 @@ prepare_gene_data <- function(gene, data_loaded) {
   gene_data <- data.frame(
     Expression = countMatrix[gene, ], 
     Barcode = colnames(countMatrix),
-    Cluster = data_loaded$clusterMat[,2]
+    Cluster = data_loaded$clusterMat[,1]
   )
   
   return(gene_data)
