@@ -72,7 +72,7 @@ create_plot_with_stats <- function(plot_func, gene_data, gene, comparisons, disp
     vjust = 1.2,
     hjust = 0
   ) +
-    scale_y_continuous(expand = expand_scale(mult = c(0, 0.15)))
+    scale_y_continuous(expand = expansion(mult = c(0, 0.15)))
   
   return(p)
 }
