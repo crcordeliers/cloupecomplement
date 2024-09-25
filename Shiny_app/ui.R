@@ -1,6 +1,6 @@
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
-               Seurat, reshape2, ggpubr, pheatmap)
+               Seurat, reshape2, ggpubr, pheatmap, viridis)
 
 ui <- dashboardPage(
   dashboardHeader(title = "cLoupeComplement"),
@@ -39,9 +39,9 @@ ui <- dashboardPage(
               conditionalPanel(
                 condition = "input.show_comparisons == true",
                 fluidRow(
-                  column(6, selectizeInput("comparison_select", "Select clusters to compare:",
+                  column(4, selectizeInput("comparison_select", "Select clusters to compare:",
                                  choices = NULL, multiple = TRUE, options = list(maxItems = 2))),
-                  column(6, checkboxInput("display_pval", "Show comparisons as pval", FALSE))
+                  column(4, checkboxInput("display_pval", "Show comparisons as pval", FALSE)),
                 ),
                 actionButton("add_comparison", "Add Comparison"),
                 actionButton("remove_comparison", "Remove Last Comparison"),
@@ -56,8 +56,8 @@ ui <- dashboardPage(
               h2("Heatmap & Dotplots"),
               selectizeInput("gene_select_dotplot", "Select Genes of Interest:",
                              choices = NULL, multiple = TRUE),
-              plotOutput("heatmap"),
-              plotOutput("dotplot")
+              plotOutput("heatmapPlot"),
+              plotOutput("dotPlot")
       ),
       
       # Diffexp tab (Work in progress)

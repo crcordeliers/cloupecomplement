@@ -15,6 +15,7 @@ server <- function(input, output, session) {
     
     data_loaded$seuratObj <- loadAndPreprocess(folderCellRangerOut)
     data_loaded$clusterMat <- loadClusterMat(filenameCluster, data_loaded$seuratObj)
+    data_loaded$seuratObj[[]]["clusterMat"] <- data_loaded$clusterMat
     
     sorted_clusters <- sort(unique(data_loaded$clusterMat[,1]))
     updateSelectizeInput(session, "gene_select", choices = rownames(data_loaded$seuratObj), server = TRUE)
@@ -106,4 +107,26 @@ server <- function(input, output, session) {
       dev.off()
     }
   )
+  
+  output$heatmapPlot <- renderPlot({
+    req(input$gene_select_dotplot, data_loaded$seuratObj)
+    
+    DoHeatmap(
+      object = data_loaded$seuratObj,
+      features = input$gene_select_dotplot,
+      group.by = "clusterMat"
+    ) + scale_fill_viridis(option = "plasma")
+  })
+  
+  output$dotPlot <- renderPlot({
+    req(input$gene_select_dotplot, data_loaded$seuratObj)
+    
+    DotPlot(
+      object = data_loaded$seuratObj,
+      features = input$gene_select_dotplot,
+      group.by = "clusterMat"
+    ) + 
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      scale_fill_viridis(option = "plasma")
+  })
 }

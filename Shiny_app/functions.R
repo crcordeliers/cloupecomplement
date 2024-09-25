@@ -6,6 +6,7 @@ loadAndPreprocess <- function(folderCellRangerOut){
   seuratObj <- subset(seuratObj, features = genes_to_keep)
   
   seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
+  seuratObj <- ScaleData(seuratObj)
   
   return(seuratObj)
 }
