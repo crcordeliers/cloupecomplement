@@ -17,9 +17,12 @@ server <- function(input, output, session) {
     data_loaded$clusterMat <- loadClusterMat(filenameCluster, data_loaded$seuratObj)
     data_loaded$seuratObj[[]]["clusterMat"] <- data_loaded$clusterMat
     
+    gene_expression_sums <- Matrix::rowSums(data_loaded$seuratObj[["Spatial"]]$counts)
+    ordered_genes <- names(sort(gene_expression_sums, decreasing = TRUE))
+    
     sorted_clusters <- sort(unique(data_loaded$clusterMat[,1]))
-    updateSelectizeInput(session, "gene_select", choices = rownames(data_loaded$seuratObj), server = TRUE)
-    updateSelectizeInput(session, "gene_select_dotplot", choices = rownames(data_loaded$seuratObj), server = TRUE)
+    updateSelectizeInput(session, "gene_select", choices = ordered_genes, server = TRUE)
+    updateSelectizeInput(session, "gene_select_dotplot", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
   })
   
