@@ -1,7 +1,3 @@
-if (!require("pacman")) install.packages("pacman", quiet = TRUE)
-pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
-               Seurat, reshape2, ggpubr)
-
 server <- function(input, output, session) {
   # Load functions from functions.R
   source("functions.R")
