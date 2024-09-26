@@ -5,6 +5,7 @@ server <- function(input, output, session) {
   # Reactive values for loaded data and comparisons
   data_loaded <- reactiveValues(seuratObj = NULL, clusterMat = NULL)
   comparisons <- reactiveVal(list())
+  diffexp_results <- reactiveVal(data.frame())
   
   # Event to load data when the user clicks the load button
   observeEvent(input$load_data, {
@@ -18,6 +19,8 @@ server <- function(input, output, session) {
     data_loaded$clusterMat <- loadClusterMat(filenameCluster, data_loaded$seuratObj)
     data_loaded$seuratObj[[]]["clusterMat"] <- data_loaded$clusterMat
     
+    Idents(data_loaded$seuratObj) <- data_loaded$seuratObj[[]]["clusterMat"][[1]]
+    
     gene_expression_sums <- Matrix::rowSums(data_loaded$seuratObj[["Spatial"]]$counts)
     ordered_genes <- names(sort(gene_expression_sums, decreasing = TRUE))
     
@@ -25,6 +28,7 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "gene_select", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "gene_select_dotplot", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
+    updateSelectizeInput(session, "selected_cluster", choices = sorted_clusters, selected = sorted_clusters[1])
     
     # Update the filtered out information
     output$data_info <- renderPrint({
@@ -120,6 +124,7 @@ server <- function(input, output, session) {
     }
   )
   
+  # Heatmap & Dotplot
   output$heatmapPlot <- renderPlot({
     req(input$gene_select_dotplot, data_loaded$seuratObj)
     
@@ -141,4 +146,42 @@ server <- function(input, output, session) {
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
       scale_fill_viridis(option = "plasma")
   })
+  
+  observeEvent(input$selected_cluster, {
+    req(data_loaded$seuratObj, input$selected_cluster)
+    
+    selected_cluster <- input$selected_cluster
+    
+    # Perform differential expression analysis between selected cluster and all other clusters
+    diffexp <- FindMarkers(data_loaded$seuratObj, ident.1 = selected_cluster, ident.2 = NULL) # NULL compares to all other clusters
+    
+    # Format p-values and log fold change, if they exist in the results
+    if ("p_val" %in% colnames(diffexp)) {
+      diffexp$p_val <- format_pval(diffexp$p_val)
+    }
+    if ("p_val_adj" %in% colnames(diffexp)) {
+      diffexp$p_val_adj <- format_pval(diffexp$p_val_adj)
+    }
+    if ("avg_log2FC" %in% colnames(diffexp)) {
+      diffexp$avg_log2FC <- format_pval(diffexp$avg_log2FC)
+    }
+    
+    # Store the formatted results in diffexp_results
+    diffexp_results(diffexp)
+    
+    # Display the differential expression table
+    output$diffexp_table <- DT::renderDataTable({
+      DT::datatable(diffexp_results(), options = list(pageLength = 10, autoWidth = TRUE))
+    })
+  })
+  
+  # Download the differential expression results
+  output$download_diffexp <- downloadHandler(
+    filename = function() {
+      paste("DiffExp_Cluster", input$selected_cluster, "_vs_all_others.csv", sep = "")
+    },
+    content = function(file) {
+      write.csv(diffexp_results(), file)
+    }
+  )
 }

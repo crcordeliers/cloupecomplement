@@ -61,10 +61,14 @@ ui <- dashboardPage(
               plotOutput("dotPlot")
       ),
       
-      # Diffexp tab (Work in progress)
-      tabItem(tabName = "diffexp",
-              h2("Differential expression")
-              
+      # Diffexp tab
+      tabItem(
+        tabName = "diffexp",
+        h2("Differential Expression Analysis"),
+        selectInput("selected_cluster", "Select Cluster:", choices = NULL, selected = NULL),
+        br(), br(),
+        DT::dataTableOutput("diffexp_table"),
+        downloadButton("download_diffexp", "Download Differential Expression Results")
       ),
       
       # Pathway Analysis tab (Work in progress)

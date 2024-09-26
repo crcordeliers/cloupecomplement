@@ -21,6 +21,18 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
   list(seuratObj = seuratObj, filtered_genes = length(filtered_genes), filtered_spots = length(filtered_spots))
 }
 
+loadClusterMat <- function(filenameCluster, seuratObj) {
+  clusterMat <- read.csv2(filenameCluster, sep = ",", row.names = 1)
+  
+  barcodes <- colnames(seuratObj[["Spatial"]]$data)
+  
+  common_barcodes <- intersect(barcodes, rownames(clusterMat))
+  clusterMat <- clusterMat[common_barcodes, , drop = FALSE]
+  clusterMat <- clusterMat[match(barcodes, rownames(clusterMat)), , drop = FALSE]
+  
+  return(clusterMat)
+}
+
 
 prepare_gene_data <- function(gene, data_loaded) {
   countMatrix <- data_loaded$seuratObj[["Spatial"]]$data
@@ -74,4 +86,8 @@ create_plot_with_stats <- function(plot_func, gene_data, gene, comparisons, disp
     scale_y_continuous(expand = expansion(mult = c(0, 0.15)))
   
   return(p)
+}
+
+format_pval <- function(pval, threshold = 1e-6) {
+  ifelse(pval < threshold, format(pval, scientific = TRUE, digits = 3), round(pval, 3))
 }
