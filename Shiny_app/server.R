@@ -144,7 +144,7 @@ server <- function(input, output, session) {
       group.by = "clusterMat"
     ) + 
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      scale_fill_viridis(option = "plasma")
+      scale_color_viridis_c(option = "plasma")
   })
   
   observeEvent(input$selected_cluster, {
