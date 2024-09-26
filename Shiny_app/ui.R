@@ -16,14 +16,15 @@ ui <- dashboardPage(
   dashboardBody(
     tabItems(
       # Data loading tab
-      tabItem(tabName = "data_loading",
-              h2("Data Loading"),
-              textInput("cellranger_out", "Enter CellRanger Output Folder Path", 
-                        placeholder = "/path/to/cellranger/outs"),
-              fileInput("cluster_csv", "Choose Cluster CSV File", 
-                        accept = ".csv", placeholder = "No file selected"),
-              actionButton("load_data", "Load Data"),
-              verbatimTextOutput("data_info")
+      tabItem(
+        tabName = "data_loading",
+        h2("Data Loading"),
+        textInput("cellranger_out", "Enter CellRanger Output Folder Path", placeholder = "/path/to/cellranger/outs"),
+        fileInput("cluster_csv", "Choose Cluster CSV File", accept = ".csv", placeholder = "No file selected"),
+        numericInput("gene_expression_cutoff", "Minimum % of cells expressing gene:", value = 1, min = 0, max = 100, step = 1),
+        numericInput("spot_gene_cutoff", "Minimum number of genes expressed per spot:", value = 100, min = 0, step = 10),
+        actionButton("load_data", "Load Data"),
+        verbatimTextOutput("data_info")
       ),
       
       # Violin & Beeswarm Plots tab
@@ -62,7 +63,8 @@ ui <- dashboardPage(
       
       # Diffexp tab (Work in progress)
       tabItem(tabName = "diffexp",
-              h2("Diffexp - Work in Progress")
+              h2("Differential expression")
+              
       ),
       
       # Pathway Analysis tab (Work in progress)

@@ -1,26 +1,24 @@
-loadAndPreprocess <- function(folderCellRangerOut){
+loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_gene_cutoff){
   seuratObj <- Load10X_Spatial(folderCellRangerOut)
+  
+  # Filter genes based on minimum expression in % of cells
   percent_expressed <- rowSums(seuratObj[["Spatial"]]$counts > 0) / ncol(seuratObj) * 100
-  # Keep genes expressed in at least 1% of cells
-  genes_to_keep <- names(percent_expressed[percent_expressed >= 1])
+  genes_to_keep <- names(percent_expressed[percent_expressed >= gene_expression_cutoff])
+  filtered_genes <- setdiff(rownames(seuratObj), genes_to_keep)
   seuratObj <- subset(seuratObj, features = genes_to_keep)
   
+  # Filter spots based on minimum number of genes expressed per spot
+  expressed_genes_per_spot <- colSums(seuratObj[["Spatial"]]$counts > 0)
+  spots_to_keep <- names(expressed_genes_per_spot[expressed_genes_per_spot >= spot_gene_cutoff])
+  filtered_spots <- setdiff(colnames(seuratObj), spots_to_keep)
+  seuratObj <- subset(seuratObj, cells = spots_to_keep)
+  
+  # Normalize and Scale the data
   seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
   seuratObj <- ScaleData(seuratObj)
   
-  return(seuratObj)
-}
-
-loadClusterMat <- function(filenameCluster, seuratObj) {
-  clusterMat <- read.csv2(filenameCluster, sep = ",", row.names = 1)
-  
-  barcodes <- colnames(seuratObj[["Spatial"]]$data)
-  
-  common_barcodes <- intersect(barcodes, rownames(clusterMat))
-  clusterMat <- clusterMat[common_barcodes, , drop = FALSE]
-  clusterMat <- clusterMat[match(barcodes, rownames(clusterMat)), , drop = FALSE]
-  
-  return(clusterMat)
+  # Return the filtered seurat object and the counts of filtered genes and spots
+  list(seuratObj = seuratObj, filtered_genes = length(filtered_genes), filtered_spots = length(filtered_spots))
 }
 
 

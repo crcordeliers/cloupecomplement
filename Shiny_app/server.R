@@ -8,12 +8,13 @@ server <- function(input, output, session) {
   
   # Event to load data when the user clicks the load button
   observeEvent(input$load_data, {
-    req(input$cellranger_out, input$cluster_csv)
+    req(input$cellranger_out, input$cluster_csv, input$gene_expression_cutoff, input$spot_gene_cutoff)
     
     folderCellRangerOut <- input$cellranger_out
     filenameCluster <- input$cluster_csv$datapath
     
-    data_loaded$seuratObj <- loadAndPreprocess(folderCellRangerOut)
+    filter_results <- loadAndPreprocess(folderCellRangerOut, input$gene_expression_cutoff, input$spot_gene_cutoff)
+    data_loaded$seuratObj <- filter_results$seuratObj
     data_loaded$clusterMat <- loadClusterMat(filenameCluster, data_loaded$seuratObj)
     data_loaded$seuratObj[[]]["clusterMat"] <- data_loaded$clusterMat
     
@@ -24,6 +25,14 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "gene_select", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "gene_select_dotplot", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
+    
+    # Update the filtered out information
+    output$data_info <- renderPrint({
+      cat("Seurat Object Dimensions:", dim(data_loaded$seuratObj), "\n")
+      cat("Cluster Matrix Dimensions:", dim(data_loaded$clusterMat), "\n")
+      cat("Filtered out genes:", filter_results$filtered_genes, "\n")
+      cat("Filtered out spots:", filter_results$filtered_spots, "\n")
+    })
   })
   
   output$data_info <- renderPrint({
