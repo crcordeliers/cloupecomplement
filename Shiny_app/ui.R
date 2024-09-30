@@ -1,6 +1,7 @@
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
-               Seurat, reshape2, ggpubr, pheatmap, viridis)
+               Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
+               org.Hs.eg.db)
 
 ui <- dashboardPage(
   dashboardHeader(title = "cLoupeComplement"),
@@ -10,7 +11,7 @@ ui <- dashboardPage(
       menuItem("Violin & Beeswarm Plots", tabName = "plots", icon = icon("chart-simple")),
       menuItem("Heatmap & Dotplots", tabName = "hmap_dotplot", icon = icon("chart-bar")),
       menuItem("Diffexp", tabName = "diffexp", icon = icon("table")),
-      menuItem("Pathway Analysis", tabName = "pathway", icon = icon("dna"))
+      menuItem("Pathway Analysis", tabName = "pathway_analysis", icon = icon("dna"))
     )
   ),
   dashboardBody(
@@ -72,8 +73,22 @@ ui <- dashboardPage(
       ),
       
       # Pathway Analysis tab (Work in progress)
-      tabItem(tabName = "pathway",
-              h2("Pathway Analysis - Work in Progress")
+      tabItem(tabName = "pathway_analysis",
+              fluidRow(
+                box(title = "Pathway Analysis Settings", width = 4,
+                    checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
+                    conditionalPanel(
+                      condition = "input.use_custom_diffexp == true",
+                      fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
+                    ),
+                    selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler", "fgsea")),
+                    actionButton("run_pathway", "Run Analysis")
+                ),
+                box(title = "Pathway Analysis Results", width = 8,
+                    tableOutput("pathway_results"),
+                    plotOutput("pathway_plot")
+                )
+              )
       )
     )
   )

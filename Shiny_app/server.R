@@ -184,4 +184,60 @@ server <- function(input, output, session) {
       write.csv(diffexp_results(), file)
     }
   )
+  
+  # Reactive expression to get the differential expression results based on user input
+  diffexp_data <- reactive({
+    if (input$use_custom_diffexp) {
+      # If custom file is uploaded, read it
+      req(input$diffexp_file)
+      df <- read.csv(input$diffexp_file$datapath, header = TRUE, sep = ",")
+      return(df)
+    } else {
+      # Use the results from the diffexp tab (assuming they are stored in a reactive variable)
+      req(diffexp_results)
+      return(diffexp_results())  # Adjust `diffexp_results()` to match your app's data structure
+    }
+  })
+  
+  # Run pathway analysis when the button is clicked
+  observeEvent(input$run_pathway, {
+    req(diffexp_data(), input$pathway_method)
+    genes <- diffexp_data()$gene  # Assuming 'gene' column exists in the data
+    method <- input$pathway_method
+    
+    # Add loading bar with progress
+    withProgress(message = 'Running Pathway Analysis...', value = 0, {
+      incProgress(0.3, detail = "Preparing data...")
+      
+      # Run the analysis with incremental progress updates
+      result <- runPathwayAnalysis(genes, method)
+      
+      incProgress(0.7, detail = "Generating plots...")
+      
+      # Render results and plots
+      output$pathway_results <- renderTable({
+        as.data.frame(result)
+      })
+      
+      output$pathway_plot <- renderPlot({
+        if (method == "clusterProfiler") {
+          if (inherits(result, "enrichResult")) {
+            barplot(result, showCategory = 20)
+          } else {
+            plot(1, 1, main = "Error: Result not compatible with barplot")
+          }
+        } else if (method == "fgsea") {
+          if ("NES" %in% colnames(result)) {
+            ggplot(result, aes(x = reorder(pathway, NES), y = NES)) +
+              geom_bar(stat = "identity") +
+              coord_flip()
+          } else {
+            plot(1, 1, main = "Error: Result not compatible with barplot")
+          }
+        }
+      })
+      
+      incProgress(1, detail = "Completed")
+    })
+  })
 }

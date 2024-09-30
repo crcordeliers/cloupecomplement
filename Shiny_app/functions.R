@@ -1,24 +1,32 @@
 loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_gene_cutoff){
-  seuratObj <- Load10X_Spatial(folderCellRangerOut)
-  
-  # Filter genes based on minimum expression in % of cells
-  percent_expressed <- rowSums(seuratObj[["Spatial"]]$counts > 0) / ncol(seuratObj) * 100
-  genes_to_keep <- names(percent_expressed[percent_expressed >= gene_expression_cutoff])
-  filtered_genes <- setdiff(rownames(seuratObj), genes_to_keep)
-  seuratObj <- subset(seuratObj, features = genes_to_keep)
-  
-  # Filter spots based on minimum number of genes expressed per spot
-  expressed_genes_per_spot <- colSums(seuratObj[["Spatial"]]$counts > 0)
-  spots_to_keep <- names(expressed_genes_per_spot[expressed_genes_per_spot >= spot_gene_cutoff])
-  filtered_spots <- setdiff(colnames(seuratObj), spots_to_keep)
-  seuratObj <- subset(seuratObj, cells = spots_to_keep)
-  
-  # Normalize and Scale the data
-  seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
-  seuratObj <- ScaleData(seuratObj)
-  
-  # Return the filtered seurat object and the counts of filtered genes and spots
-  list(seuratObj = seuratObj, filtered_genes = length(filtered_genes), filtered_spots = length(filtered_spots))
+  withProgress(message = "Loading data...", value = 0, {
+    incProgress(0.1, detail = "Preparing data...")
+    seuratObj <- Load10X_Spatial(folderCellRangerOut)
+    
+    incProgress(0.2, detail = "Filtering genes...")
+    # Filter genes based on minimum expression in % of cells
+    percent_expressed <- rowSums(seuratObj[["Spatial"]]$counts > 0) / ncol(seuratObj) * 100
+    genes_to_keep <- names(percent_expressed[percent_expressed >= gene_expression_cutoff])
+    filtered_genes <- setdiff(rownames(seuratObj), genes_to_keep)
+    seuratObj <- subset(seuratObj, features = genes_to_keep)
+    
+    incProgress(0.3, detail = "Filtering spots...")
+    # Filter spots based on minimum number of genes expressed per spot
+    expressed_genes_per_spot <- colSums(seuratObj[["Spatial"]]$counts > 0)
+    spots_to_keep <- names(expressed_genes_per_spot[expressed_genes_per_spot >= spot_gene_cutoff])
+    filtered_spots <- setdiff(colnames(seuratObj), spots_to_keep)
+    seuratObj <- subset(seuratObj, cells = spots_to_keep)
+    
+    incProgress(0.4, detail = "Normalizing the data...")
+    # Normalize and Scale the data
+    seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
+    
+    incProgress(0.7, detail = "Scaling the data...")
+    seuratObj <- ScaleData(seuratObj)
+    
+    # Return the filtered seurat object and the counts of filtered genes and spots
+    list(seuratObj = seuratObj, filtered_genes = length(filtered_genes), filtered_spots = length(filtered_spots))
+  })
 }
 
 loadClusterMat <- function(filenameCluster, seuratObj) {
@@ -90,4 +98,16 @@ create_plot_with_stats <- function(plot_func, gene_data, gene, comparisons, disp
 
 format_pval <- function(pval, threshold = 1e-6) {
   ifelse(pval < threshold, format(pval, scientific = TRUE, digits = 3), round(pval, 3))
+}
+
+runPathwayAnalysis <- function(genes, method = "clusterProfiler") {
+  if (method == "clusterProfiler") {
+    result <- enrichGO(gene = genes, OrgDb = org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP", pAdjustMethod = "BH")
+  } else if (method == "fgsea") {
+    pathways <- fgsea::examplePathways
+    ranks <- stats::rnorm(length(genes))
+    names(ranks) <- genes
+    result <- fgsea(pathways = pathways, stats = ranks, minSize = 15, maxSize = 500)
+  }
+  return(result)
 }
