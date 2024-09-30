@@ -1,5 +1,9 @@
 server <- function(input, output, session) {
-  # Load functions from functions.R
+  if (!require("pacman")) install.packages("pacman", quiet = TRUE)
+  pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
+                 Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
+                 org.Hs.eg.db)
+  
   source("functions.R")
   
   # Reactive values for loaded data and comparisons
