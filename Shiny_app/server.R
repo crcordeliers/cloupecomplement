@@ -207,15 +207,9 @@ server <- function(input, output, session) {
     
     method <- input$pathway_method
     
-    # Add loading bar with progress
-    withProgress(message = 'Running Pathway Analysis...', value = 0, {
-      incProgress(0.3, detail = "Preparing data...")
-      
+    withProgress(message = 'Running Pathway Analysis', value = 0, {
       result <- runPathwayAnalysis(genes, method)
       
-      incProgress(0.7, detail = "Generating plots...")
-      
-      # Render results and plots
       output$pathway_results <- renderTable({
         as.data.frame(result)
       })
@@ -237,8 +231,6 @@ server <- function(input, output, session) {
           }
         }
       })
-      
-      incProgress(1, detail = "Completed")
     })
   })
   

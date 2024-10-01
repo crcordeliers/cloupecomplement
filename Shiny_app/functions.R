@@ -3,25 +3,25 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
     incProgress(0.1, detail = "Preparing data...")
     seuratObj <- Load10X_Spatial(folderCellRangerOut)
     
-    incProgress(0.2, detail = "Filtering genes...")
+    incProgress(0.1, detail = "Filtering genes...")
     # Filter genes based on minimum expression in % of cells
     percent_expressed <- rowSums(seuratObj[["Spatial"]]$counts > 0) / ncol(seuratObj) * 100
     genes_to_keep <- names(percent_expressed[percent_expressed >= gene_expression_cutoff])
     filtered_genes <- setdiff(rownames(seuratObj), genes_to_keep)
     seuratObj <- subset(seuratObj, features = genes_to_keep)
     
-    incProgress(0.3, detail = "Filtering spots...")
+    incProgress(0.1, detail = "Filtering spots...")
     # Filter spots based on minimum number of genes expressed per spot
     expressed_genes_per_spot <- colSums(seuratObj[["Spatial"]]$counts > 0)
     spots_to_keep <- names(expressed_genes_per_spot[expressed_genes_per_spot >= spot_gene_cutoff])
     filtered_spots <- setdiff(colnames(seuratObj), spots_to_keep)
     seuratObj <- subset(seuratObj, cells = spots_to_keep)
     
-    incProgress(0.4, detail = "Normalizing the data...")
+    incProgress(0.3, detail = "Normalizing the data...")
     # Normalize and Scale the data
     seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
     
-    incProgress(0.7, detail = "Scaling the data...")
+    incProgress(0.2, detail = "Scaling the data...")
     seuratObj <- ScaleData(seuratObj)
     
     # Return the filtered seurat object and the counts of filtered genes and spots
@@ -101,24 +101,34 @@ format_pval <- function(pval, threshold = 1e-6) {
 }
 
 convert_to_ensembl <- function(genes) {
-  print(genes)
+  incProgress(0.2, detail = "Query of Ensembl IDs")
   mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+  
+  incProgress(0.2, detail = "Mapping Ensembl IDs to Symbol")
   gene_map <- getBM(filters = "hgnc_symbol", attributes = c("ensembl_gene_id", "hgnc_symbol"), values = genes, mart = mart)
   gene_map <- gene_map %>% distinct(hgnc_symbol, .keep_all = TRUE)
-  print(gene_map)
+  
   return(gene_map)
 }
 
 runPathwayAnalysis <- function(genes, method = "clusterProfiler") {
+  incProgress(0.2, detail = "Running Pathway Analysis")
+  
   ensemblGenes <- convert_to_ensembl(genes)
+  
   if (method == "clusterProfiler") {
+    incProgress(0.2, detail = "Enrichment analysis using ClusterProfiler")
     result <- enrichGO(gene = ensemblGenes$ensembl_gene_id, OrgDb = org.Hs.eg.db,
                        keyType = "ENSEMBL", ont = "BP", pAdjustMethod = "BH")
   } else if (method == "fgsea") {
+    incProgress(0.2, detail = "Enrichment analysis using fgsea")
     pathways <- fgsea::examplePathways
     ranks <- stats::rnorm(length(ensemblGenes))
     names(ranks) <- ensemblGenes
     result <- fgsea(pathways = pathways, stats = ranks, minSize = 15, maxSize = 500)
   }
+  
+  incProgress(0.2, detail = "Rendering plots & data table")
+  
   return(result)
 }
