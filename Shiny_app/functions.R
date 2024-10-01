@@ -36,7 +36,7 @@ loadClusterMat <- function(filenameCluster, seuratObj) {
   
   common_barcodes <- intersect(barcodes, rownames(clusterMat))
   clusterMat <- clusterMat[common_barcodes, , drop = FALSE]
-  clusterMat <- clusterMat[match(barcodes, rownames(clusterMat)), , drop = FALSE]
+  clusterMat <- clusterMat[match(barcodes, rownames(clusterMat)), drop = FALSE]
   
   return(clusterMat)
 }

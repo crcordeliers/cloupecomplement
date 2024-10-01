@@ -25,7 +25,7 @@ ui <- dashboardPage(
             status = "primary",
 
             fluidRow(
-              column(6, 
+              column(6,
                      textInput("cellranger_out", "Enter CellRanger Output Folder Path", 
                                placeholder = "/path/to/cellranger/outs")
               ),
@@ -59,26 +59,72 @@ ui <- dashboardPage(
       # Violin & Beeswarm Plots tab
       tabItem(tabName = "plots",
               h2("Violin & Beeswarm Plots"),
+              
+              # download buttons
               fluidRow(
-                column(6, downloadButton("download_png", "Download as PNG")),
-                column(6, downloadButton("download_pdf", "Download as PDF"))
+                column(6, 
+                       downloadButton("download_png", "Download as PNG", class = "btn-primary")),
+                column(6, 
+                       downloadButton("download_pdf", "Download as PDF", class = "btn-success"))
               ),
-              selectizeInput("gene_select", "Select Gene of Interest:",
-                             choices = NULL, multiple = FALSE),
-              checkboxInput("show_comparisons", "Show pairwise comparisons", FALSE),
+              br(),
+              # gene selection and options
+              fluidRow(
+                box(
+                  width = 12,
+                  title = "Plot Options",
+                  solidHeader = TRUE,
+                  status = "info",
+                  
+                  selectizeInput("gene_select", "Select Gene of Interest:",
+                                 choices = NULL, multiple = FALSE),
+                  checkboxInput("show_comparisons", "Show pairwise comparisons", FALSE)
+                )
+              ),
+              
+              # Conditional panel for comparisons
               conditionalPanel(
                 condition = "input.show_comparisons == true",
                 fluidRow(
-                  column(4, selectizeInput("comparison_select", "Select clusters to compare:",
-                                 choices = NULL, multiple = TRUE, options = list(maxItems = 2))),
-                  column(4, checkboxInput("display_pval", "Show comparisons as pval", FALSE)),
-                ),
-                actionButton("add_comparison", "Add Comparison"),
-                actionButton("remove_comparison", "Remove Last Comparison"),
-                verbatimTextOutput("current_comparisons")
+                  box(
+                    width = 12,
+                    title = "Comparisons",
+                    solidHeader = TRUE,
+                    status = "warning",
+                    
+                    fluidRow(
+                      column(4, 
+                             selectizeInput("comparison_select", "Select clusters to compare:",
+                                            choices = NULL, multiple = TRUE, 
+                                            options = list(maxItems = 2))),
+                      column(4, 
+                             checkboxInput("display_pval", "Show comparisons as pval", FALSE)),
+                      column(4, 
+                             actionButton("add_comparison", "Add Comparison", class = "btn-success"),
+                             actionButton("remove_comparison", "Remove Last Comparison", class = "btn-danger"))
+                    ),
+                    verbatimTextOutput("current_comparisons")
+                  )
+                )
               ),
-              plotOutput("violinPlot"),
-              plotOutput("beeswarmPlot")
+              
+              # display plots
+              fluidRow(
+                box(
+                  width = 6, 
+                  title = "Violin Plot", 
+                  solidHeader = TRUE, 
+                  status = "primary",
+                  plotOutput("violinPlot")
+                ),
+                box(
+                  width = 6, 
+                  title = "Beeswarm Plot", 
+                  solidHeader = TRUE, 
+                  status = "primary",
+                  plotOutput("beeswarmPlot")
+                )
+              )
       ),
       
       # Heatmap & Dotplot tab
