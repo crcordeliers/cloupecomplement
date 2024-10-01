@@ -15,10 +15,43 @@ ui <- dashboardPage(
       tabItem(
         tabName = "data_loading",
         h2("Data Loading"),
-        textInput("cellranger_out", "Enter CellRanger Output Folder Path", placeholder = "/path/to/cellranger/outs"),
-        fileInput("cluster_csv", "Choose Cluster CSV File", accept = ".csv", placeholder = "No file selected"),
-        numericInput("gene_expression_cutoff", "Minimum % of cells expressing gene:", value = 1, min = 0, max = 100, step = 1),
-        numericInput("spot_gene_cutoff", "Minimum number of genes expressed per spot:", value = 100, min = 0, step = 10),
+        
+        # data loading inputs
+        fluidRow(
+          box(
+            width = 12,
+            title = "Data Input",
+            solidHeader = TRUE,
+            status = "primary",
+
+            fluidRow(
+              column(6, 
+                     textInput("cellranger_out", "Enter CellRanger Output Folder Path", 
+                               placeholder = "/path/to/cellranger/outs")
+              ),
+              column(6, 
+                     fileInput("cluster_csv", "Choose Cluster CSV File", 
+                               accept = ".csv", placeholder = "No file selected")
+              )
+            ),
+          )
+        ),
+        
+        # preprocessing options
+        fluidRow(
+          box(
+            width = 12,
+            title = "Preprocessing",
+            solidHeader = TRUE,
+            status = "warning",
+            
+            selectInput("species", "Select Species", choices = c("Human", "Mouse"), selected = "Human"),
+            numericInput("gene_expression_cutoff", "Minimum % of cells expressing gene:", 
+                         value = 1, min = 0, max = 100, step = 1),
+            numericInput("spot_gene_cutoff", "Minimum number of genes expressed per spot:", 
+                         value = 100, min = 0, step = 10)
+          )
+        ),
         actionButton("load_data", "Load Data"),
         verbatimTextOutput("data_info")
       ),
@@ -67,7 +100,7 @@ ui <- dashboardPage(
         downloadButton("download_diffexp", "Download Differential Expression Results")
       ),
       
-      # Pathway Analysis tab (Work in progress)
+      # Pathway Analysis tab
       tabItem(tabName = "pathway_analysis",
               fluidRow(
                 box(title = "Pathway Analysis Settings", width = 4,
