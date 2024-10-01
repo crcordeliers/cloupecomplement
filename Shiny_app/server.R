@@ -155,11 +155,8 @@ server <- function(input, output, session) {
     req(data_loaded$seuratObj, input$selected_cluster)
     
     selected_cluster <- input$selected_cluster
-    
-    # Perform differential expression analysis between selected cluster and all other clusters
     diffexp <- FindMarkers(data_loaded$seuratObj, ident.1 = selected_cluster, ident.2 = NULL) # NULL compares to all other clusters
     
-    # Format p-values and log fold change, if they exist in the results
     if ("p_val" %in% colnames(diffexp)) {
       diffexp$p_val <- format_pval(diffexp$p_val)
     }
@@ -170,16 +167,13 @@ server <- function(input, output, session) {
       diffexp$avg_log2FC <- format_pval(diffexp$avg_log2FC)
     }
     
-    # Store the formatted results in diffexp_results
     diffexp_results(diffexp)
     
-    # Display the differential expression table
     output$diffexp_table <- DT::renderDataTable({
       DT::datatable(diffexp_results(), options = list(pageLength = 10, autoWidth = TRUE))
     })
   })
   
-  # Download the differential expression results
   output$download_diffexp <- downloadHandler(
     filename = function() {
       paste("DiffExp_Cluster", input$selected_cluster, "_vs_all_others.csv", sep = "")
@@ -189,31 +183,34 @@ server <- function(input, output, session) {
     }
   )
   
-  # Reactive expression to get the differential expression results based on user input
   diffexp_data <- reactive({
     if (input$use_custom_diffexp) {
-      # If custom file is uploaded, read it
       req(input$diffexp_file)
       df <- read.csv(input$diffexp_file$datapath, header = TRUE, sep = ",")
       return(df)
     } else {
-      # Use the results from the diffexp tab (assuming they are stored in a reactive variable)
       req(diffexp_results)
-      return(diffexp_results())  # Adjust `diffexp_results()` to match your app's data structure
+      return(diffexp_results())
     }
   })
   
   # Run pathway analysis when the button is clicked
   observeEvent(input$run_pathway, {
     req(diffexp_data(), input$pathway_method)
-    genes <- diffexp_data()$gene  # Assuming 'gene' column exists in the data
+    
+    genes <- rownames(diffexp_data())
+    
+    if (is.null(genes) || length(genes) == 0) {
+      showNotification("No genes found for pathway analysis", type = "error")
+      return(NULL)
+    }
+    
     method <- input$pathway_method
     
     # Add loading bar with progress
     withProgress(message = 'Running Pathway Analysis...', value = 0, {
       incProgress(0.3, detail = "Preparing data...")
       
-      # Run the analysis with incremental progress updates
       result <- runPathwayAnalysis(genes, method)
       
       incProgress(0.7, detail = "Generating plots...")
@@ -244,4 +241,5 @@ server <- function(input, output, session) {
       incProgress(1, detail = "Completed")
     })
   })
+  
 }

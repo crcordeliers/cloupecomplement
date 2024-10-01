@@ -100,13 +100,24 @@ format_pval <- function(pval, threshold = 1e-6) {
   ifelse(pval < threshold, format(pval, scientific = TRUE, digits = 3), round(pval, 3))
 }
 
+convert_to_ensembl <- function(genes) {
+  print(genes)
+  mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+  gene_map <- getBM(filters = "hgnc_symbol", attributes = c("ensembl_gene_id", "hgnc_symbol"), values = genes, mart = mart)
+  gene_map <- gene_map %>% distinct(hgnc_symbol, .keep_all = TRUE)
+  print(gene_map)
+  return(gene_map)
+}
+
 runPathwayAnalysis <- function(genes, method = "clusterProfiler") {
+  ensemblGenes <- convert_to_ensembl(genes)
   if (method == "clusterProfiler") {
-    result <- enrichGO(gene = genes, OrgDb = org.Hs.eg.db, keyType = "ENSEMBL", ont = "BP", pAdjustMethod = "BH")
+    result <- enrichGO(gene = ensemblGenes$ensembl_gene_id, OrgDb = org.Hs.eg.db,
+                       keyType = "ENSEMBL", ont = "BP", pAdjustMethod = "BH")
   } else if (method == "fgsea") {
     pathways <- fgsea::examplePathways
-    ranks <- stats::rnorm(length(genes))
-    names(ranks) <- genes
+    ranks <- stats::rnorm(length(ensemblGenes))
+    names(ranks) <- ensemblGenes
     result <- fgsea(pathways = pathways, stats = ranks, minSize = 15, maxSize = 500)
   }
   return(result)
