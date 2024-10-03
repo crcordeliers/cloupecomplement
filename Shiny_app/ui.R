@@ -175,7 +175,7 @@ ui <- dashboardPage(
         h2("Differential Expression Analysis"),
         
         downloadButton("download_diffexp", "Download Differential Expression Results", class = "btn-success"),
-        br(),
+        br(), br(),
         
         # cluster selection
         fluidRow(
@@ -205,47 +205,44 @@ ui <- dashboardPage(
       
       # Pathway Analysis tab
       tabItem(tabName = "pathway_analysis",
-              fluidRow(
+              # settings
+              box(
+                title = "Pathway Analysis Settings", 
+                width = 12, 
+                solidHeader = TRUE, 
+                status = "info",
                 
-                # settings
-                box(
-                  title = "Pathway Analysis Settings", 
-                  width = 4, 
-                  solidHeader = TRUE, 
-                  status = "info",
-                  
-                  # custom diffexp checkbox & file input
-                  checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
-                  conditionalPanel(
-                    condition = "input.use_custom_diffexp == true",
-                    fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
-                  ),
-                  
-                  selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler", "fgsea")),
-                  actionButton("run_pathway", "Run Analysis", class = "btn-primary")
+                # custom diffexp checkbox & file input
+                checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
+                conditionalPanel(
+                  condition = "input.use_custom_diffexp == true",
+                  fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
                 ),
                 
-                # Results
-                box(
-                  title = "Pathway Analysis Results", 
-                  width = 8, 
-                  solidHeader = TRUE, 
-                  status = "primary",
+                selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler", "fgsea")),
+                actionButton("run_pathway", "Run Analysis", class = "btn-primary")
+              ),
+              
+              # Results
+              box(
+                title = "Pathway Analysis Results", 
+                width = 12, 
+                solidHeader = TRUE, 
+                status = "primary",
+                
+                tabsetPanel(
+                  id = "results_tabs",
                   
-                  tabsetPanel(
-                    id = "results_tabs",
-                    
-                    tabPanel(
-                      title = "Plot", 
-                      value = "plot",
-                      plotOutput("pathway_plot")
-                    ),
-                    
-                    tabPanel(
-                      title = "Data Table", 
-                      value = "table",
-                      tableOutput("pathway_results")
-                    )
+                  tabPanel(
+                    title = "Plot", 
+                    value = "plot",
+                    plotOutput("pathway_plot")
+                  ),
+                  
+                  tabPanel(
+                    title = "Data Table", 
+                    value = "table",
+                    tableOutput("pathway_results")
                   )
                 )
               )
