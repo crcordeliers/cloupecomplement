@@ -68,8 +68,6 @@ ui <- dashboardPage(
               # download buttons
               fluidRow(
                 column(6, 
-                       downloadButton("download_png", "Download as PNG", class = "btn-primary")),
-                column(6, 
                        downloadButton("download_pdf", "Download as PDF", class = "btn-success"))
               ),
               br(),
