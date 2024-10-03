@@ -1,3 +1,8 @@
+if (!require("pacman")) install.packages("pacman", quiet = TRUE)
+pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
+               Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
+               org.Hs.eg.db)
+
 ui <- dashboardPage(
   dashboardHeader(title = "cLoupeComplement"),
   dashboardSidebar(
@@ -45,7 +50,7 @@ ui <- dashboardPage(
             solidHeader = TRUE,
             status = "warning",
             
-            selectInput("species", "Select Species", choices = c("Human", "Mouse"), selected = "Human"),
+            selectInput("species", "Select Species", choices = c("Human"), selected = "Human"),
             numericInput("gene_expression_cutoff", "Minimum % of cells expressing gene:", 
                          value = 1, min = 0, max = 100, step = 1),
             numericInput("spot_gene_cutoff", "Minimum number of genes expressed per spot:", 
@@ -130,37 +135,118 @@ ui <- dashboardPage(
       # Heatmap & Dotplot tab
       tabItem(tabName = "hmap_dotplot",
               h2("Heatmap & Dotplots"),
-              selectizeInput("gene_select_dotplot", "Select Genes of Interest:",
-                             choices = NULL, multiple = TRUE),
-              plotOutput("heatmapPlot"),
-              plotOutput("dotPlot")
+              
+              # gene selection
+              fluidRow(
+                box(
+                  width = 12,
+                  title = "Plot Options",
+                  solidHeader = TRUE,
+                  status = "info",
+                  
+                  selectizeInput("gene_select_dotplot", "Select Genes of Interest:",
+                                 choices = NULL, multiple = TRUE)
+                )
+              ),
+              
+              # plots
+              fluidRow(
+                box(
+                  width = 6, 
+                  title = "Heatmap", 
+                  solidHeader = TRUE, 
+                  status = "primary",
+                  plotOutput("heatmapPlot")
+                ),
+                box(
+                  width = 6, 
+                  title = "Dotplot", 
+                  solidHeader = TRUE, 
+                  status = "primary",
+                  plotOutput("dotPlot")
+                )
+              )
       ),
+      
       
       # Diffexp tab
       tabItem(
         tabName = "diffexp",
         h2("Differential Expression Analysis"),
-        selectInput("selected_cluster", "Select Cluster:", choices = NULL, selected = NULL),
-        br(), br(),
-        DT::dataTableOutput("diffexp_table"),
-        downloadButton("download_diffexp", "Download Differential Expression Results")
+        
+        downloadButton("download_diffexp", "Download Differential Expression Results", class = "btn-success"),
+        br(),
+        
+        # cluster selection
+        fluidRow(
+          box(
+            width = 12,
+            title = "Analysis Options",
+            solidHeader = TRUE,
+            status = "info",
+            
+            selectInput("selected_cluster", "Select Cluster:", choices = NULL, selected = NULL)
+          )
+        ),
+        
+        # diffexp table
+        fluidRow(
+          box(
+            width = 12,
+            title = "Results",
+            solidHeader = TRUE,
+            status = "primary",
+            
+            DT::dataTableOutput("diffexp_table")
+          )
+        )
       ),
+      
       
       # Pathway Analysis tab
       tabItem(tabName = "pathway_analysis",
               fluidRow(
-                box(title = "Pathway Analysis Settings", width = 4,
-                    checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
-                    conditionalPanel(
-                      condition = "input.use_custom_diffexp == true",
-                      fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
-                    ),
-                    selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler", "fgsea")),
-                    actionButton("run_pathway", "Run Analysis")
+                
+                # settings
+                box(
+                  title = "Pathway Analysis Settings", 
+                  width = 4, 
+                  solidHeader = TRUE, 
+                  status = "info",
+                  
+                  # custom diffexp checkbox & file input
+                  checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
+                  conditionalPanel(
+                    condition = "input.use_custom_diffexp == true",
+                    fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
+                  ),
+                  
+                  selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler", "fgsea")),
+                  actionButton("run_pathway", "Run Analysis", class = "btn-primary")
                 ),
-                box(title = "Pathway Analysis Results", width = 8,
-                    tableOutput("pathway_results"),
-                    plotOutput("pathway_plot")
+                
+                # Results
+                box(
+                  title = "Pathway Analysis Results", 
+                  width = 8, 
+                  solidHeader = TRUE, 
+                  status = "primary",
+                  
+                  tabsetPanel(
+                    id = "results_tabs",
+                    
+                    tabPanel(
+                      title = "Plot", 
+                      value = "plot",
+                      plotOutput("pathway_plot")
+                    ),
+                    
+                    tabPanel(
+                      title = "Data Table", 
+                      value = "table",
+                      tableOutput("pathway_results")
+                    )
+                  )
                 )
               )
       )

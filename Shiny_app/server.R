@@ -1,8 +1,4 @@
 server <- function(input, output, session) {
-  if (!require("pacman")) install.packages("pacman", quiet = TRUE)
-  pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
-                 Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
-                 org.Hs.eg.db)
   
   source("functions.R")
   
@@ -96,7 +92,7 @@ server <- function(input, output, session) {
     create_plot_with_stats(create_beeswarm_plot, gene_data, input$gene_select, comparisons(), input$display_pval)
   })
   
-  # Download PNG plot (violin + beeswarm)
+  # Download PNG plot
   output$download_png <- downloadHandler(
     filename = function() {
       paste("plot_", Sys.Date(), ".png", sep = "")
