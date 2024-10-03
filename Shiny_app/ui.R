@@ -1,7 +1,7 @@
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
-               org.Hs.eg.db)
+               org.Hs.eg.db, biomaRt)
 
 ui <- dashboardPage(
   dashboardHeader(title = "cLoupeComplement"),
@@ -68,7 +68,7 @@ ui <- dashboardPage(
               # download buttons
               fluidRow(
                 column(6, 
-                       downloadButton("download_pdf", "Download as PDF", class = "btn-success"))
+                       downloadButton("download_pdf", "Download as PDF"))
               ),
               br(),
               # gene selection and options
@@ -134,6 +134,9 @@ ui <- dashboardPage(
       tabItem(tabName = "hmap_dotplot",
               h2("Heatmap & Dotplots"),
               
+              downloadButton("download_combined_pdf", "Download Heatmap & DotPlot as PDF"),
+              br(), br(),
+              
               # gene selection
               fluidRow(
                 box(
@@ -172,7 +175,7 @@ ui <- dashboardPage(
         tabName = "diffexp",
         h2("Differential Expression Analysis"),
         
-        downloadButton("download_diffexp", "Download Differential Expression Results", class = "btn-success"),
+        downloadButton("download_diffexp", "Download Differential Expression Results"),
         br(), br(),
         
         # cluster selection

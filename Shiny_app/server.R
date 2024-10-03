@@ -131,11 +131,39 @@ server <- function(input, output, session) {
       scale_color_viridis_c(option = "plasma")
   })
   
+  output$download_combined_pdf <- downloadHandler(
+    filename = function() {
+      paste("heatmap_dotplot_", Sys.Date(), ".pdf", sep = "")
+    },
+    content = function(file) {
+      pdf(file, width = 8, height = 12)
+      
+      DoHeatmap(
+        object = data_loaded$seuratObj,
+        features = input$gene_select_dotplot,
+        group.by = "clusterMat"
+      ) + scale_fill_viridis(option = "plasma")
+      
+      dev.flush()
+      
+      DotPlot(
+        object = data_loaded$seuratObj,
+        features = input$gene_select_dotplot,
+        group.by = "clusterMat"
+      ) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        scale_color_viridis_c(option = "plasma")
+      
+      dev.off()
+    }
+  )
+  
+  # diffexp
   observeEvent(input$selected_cluster, {
     req(data_loaded$seuratObj, input$selected_cluster)
     
     selected_cluster <- input$selected_cluster
-    diffexp <- FindMarkers(data_loaded$seuratObj, ident.1 = selected_cluster, ident.2 = NULL) # NULL compares to all other clusters
+    diffexp <- FindMarkers(data_loaded$seuratObj, ident.1 = selected_cluster, ident.2 = NULL)
     
     if ("p_val" %in% colnames(diffexp)) {
       diffexp$p_val <- format_pval(diffexp$p_val)
