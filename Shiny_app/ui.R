@@ -1,7 +1,7 @@
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
-               org.Hs.eg.db, biomaRt)
+               org.Hs.eg.db, biomaRt, fgsea)
 
 ui <- dashboardPage(
   dashboardHeader(title = "cLoupeComplement"),
@@ -206,44 +206,49 @@ ui <- dashboardPage(
       
       # Pathway Analysis tab
       tabItem(tabName = "pathway_analysis",
-              # settings
-              box(
-                title = "Pathway Analysis Settings", 
-                width = 12, 
-                solidHeader = TRUE, 
-                status = "info",
-                
-                # custom diffexp checkbox & file input
-                checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
-                conditionalPanel(
-                  condition = "input.use_custom_diffexp == true",
-                  fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
-                ),
-                
-                selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler", "fgsea")),
-                actionButton("run_pathway", "Run Analysis", class = "btn-primary")
-              ),
-              
-              # Results
-              box(
-                title = "Pathway Analysis Results", 
-                width = 12, 
-                solidHeader = TRUE, 
-                status = "primary",
-                
-                tabsetPanel(
-                  id = "results_tabs",
+              fluidRow(
+                box(
+                  title = "Pathway Analysis Settings", 
+                  width = 12, 
+                  solidHeader = TRUE, 
+                  status = "info",
                   
-                  tabPanel(
-                    title = "Plot", 
-                    value = "plot",
-                    plotOutput("pathway_plot")
+                  # custom diffexp checkbox & file input
+                  checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
+                  conditionalPanel(
+                    condition = "input.use_custom_diffexp == true",
+                    fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
                   ),
                   
-                  tabPanel(
-                    title = "Data Table", 
-                    value = "table",
-                    tableOutput("pathway_results")
+                  selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler")),
+                  actionButton("run_pathway", "Run Analysis", class = "btn-primary")
+                ),
+                
+                # Results
+                box(
+                  title = "Pathway Analysis Results", 
+                  width = 12, 
+                  solidHeader = TRUE, 
+                  status = "primary",
+                  
+                  tabsetPanel(
+                    id = "results_tabs",
+                    
+                    tabPanel(
+                      title = "Plot", 
+                      value = "plot",
+                      br(),
+                      downloadButton("download_pathway_plot_pdf", "Download Pathway Plot as PDF"),
+                      plotOutput("pathway_plot", height="700px")
+                    ),
+                    
+                    tabPanel(
+                      title = "Data Table", 
+                      value = "table",
+                      br(),
+                      downloadButton("download_pathway_data_csv", "Download Pathway Data Table as CSV"),
+                      DT::dataTableOutput("pathway_results")
+                    )
                   )
                 )
               )

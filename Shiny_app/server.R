@@ -202,7 +202,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Run pathway analysis when the button is clicked
+  # Run pathway analysis
   observeEvent(input$run_pathway, {
     req(diffexp_data(), input$pathway_method)
     
@@ -218,16 +218,17 @@ server <- function(input, output, session) {
     withProgress(message = 'Running Pathway Analysis', value = 0, {
       result <- runPathwayAnalysis(genes, method)
       
-      output$pathway_results <- renderTable({
-        as.data.frame(result)
+      output$pathway_results <- DT::renderDataTable({
+        resultDt <- as.data.frame(result)
+        DT::datatable(resultDt, options = list(pageLength = 20))
       })
       
       output$pathway_plot <- renderPlot({
         if (method == "clusterProfiler") {
           if (inherits(result, "enrichResult")) {
-            barplot(result, showCategory = 20)
+            dotplot(result, showCategory = 20)
           } else {
-            plot(1, 1, main = "Error: Result not compatible with barplot")
+            plot(1, 1, main = "Error: Result not compatible")
           }
         } else if (method == "fgsea") {
           if ("NES" %in% colnames(result)) {
@@ -242,4 +243,44 @@ server <- function(input, output, session) {
     })
   })
   
+  # Download Pathway Plot as a PDF
+  output$download_pathway_plot_pdf <- downloadHandler(
+    filename = function() {
+      paste("pathway_analysis_plot_", Sys.Date(), ".pdf", sep = "")
+    },
+    content = function(file) {
+      pdf(file, width = 8, height = 6)
+      
+      if (input$pathway_method == "clusterProfiler") {
+        result <- runPathwayAnalysis(rownames(diffexp_data()), input$pathway_method)
+        if (inherits(result, "enrichResult")) {
+          barplot(result, showCategory = 20)
+        } else {
+          plot(1, 1, main = "Error: Result not compatible with barplot")
+        }
+      } else if (input$pathway_method == "fgsea") {
+        result <- runPathwayAnalysis(rownames(diffexp_data()), input$pathway_method)
+        if ("NES" %in% colnames(result)) {
+          ggplot(result, aes(x = reorder(pathway, NES), y = NES)) +
+            geom_bar(stat = "identity") +
+            coord_flip()
+        } else {
+          plot(1, 1, main = "Error: Result not compatible with barplot")
+        }
+      }
+      
+      dev.off()
+    }
+  )
+  
+  # Download Pathway Data Table as CSV
+  output$download_pathway_data_csv <- downloadHandler(
+    filename = function() {
+      paste("pathway_analysis_data_", Sys.Date(), ".csv", sep = "")
+    },
+    content = function(file) {
+      result <- runPathwayAnalysis(rownames(diffexp_data()), input$pathway_method)
+      write.csv(as.data.frame(result), file, row.names = FALSE)
+    }
+  )
 }
