@@ -106,7 +106,12 @@ format_pval <- function(pval, threshold = 1e-6) {
 
 convert_to_ensembl <- function(genes) {
   incProgress(0.2, detail = "Query of Ensembl IDs")
-  mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+  mart <- tryCatch({
+    useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+  }, error = function(e) {
+    showNotification("Cannot retrieve Mart, check your connection", type = "error")
+    return(NULL)
+  })
   
   incProgress(0.2, detail = "Mapping Ensembl IDs to Symbol")
   gene_map <- getBM(filters = "hgnc_symbol", attributes = c("ensembl_gene_id", "hgnc_symbol"), values = genes, mart = mart)
@@ -119,6 +124,11 @@ runPathwayAnalysis <- function(genes, method = "clusterProfiler") {
   incProgress(0.2, detail = "Running Pathway Analysis")
   
   ensemblGenes <- convert_to_ensembl(genes)
+  
+  if (is.null(ensemblGenes)) {
+    showNotification("ensembl genes are NULL", type = "error")
+    return(NULL)
+  }
   
   if (method == "clusterProfiler") {
     incProgress(0.2, detail = "Enrichment analysis using ClusterProfiler")

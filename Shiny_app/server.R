@@ -218,6 +218,12 @@ server <- function(input, output, session) {
     withProgress(message = 'Running Pathway Analysis', value = 0, {
       result <- runPathwayAnalysis(genes, method)
       
+      # Check if result is NULL
+      if (is.null(result)) {
+        showNotification("Pathway analysis failed, please check your input or connection.", type = "error")
+        return(NULL)  # Exit the event handler if the result is NULL
+      }
+      
       output$pathway_results <- DT::renderDataTable({
         resultDt <- as.data.frame(result)
         DT::datatable(resultDt, options = list(pageLength = 20))
