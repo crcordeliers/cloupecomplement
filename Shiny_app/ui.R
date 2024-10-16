@@ -51,7 +51,7 @@ ui <- dashboardPage(
             solidHeader = TRUE,
             status = "warning",
             
-            selectInput("species", "Select Species", choices = c("Human"), selected = "Human"),
+            selectInput("species", "Select Species", choices = c("Human", "Mouse"), selected = "Human"),
             numericInput("gene_expression_cutoff", "Minimum % of cells expressing gene:", 
                          value = 1, min = 0, max = 100, step = 1),
             numericInput("spot_gene_cutoff", "Minimum number of genes expressed per spot:", 

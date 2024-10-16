@@ -120,10 +120,10 @@ convert_to_ensembl <- function(genes) {
   return(gene_map)
 }
 
-runPathwayAnalysis <- function(genes, method = "clusterProfiler") {
+runPathwayAnalysis <- function(genes, method = "clusterProfiler", species) {
   incProgress(0.2, detail = "Running Pathway Analysis")
   
-  ensemblGenes <- convert_to_ensembl(genes)
+  ensemblGenes <- convert_to_ensembl(genes, species)
   
   if (is.null(ensemblGenes)) {
     showNotification("ensembl genes are NULL", type = "error")

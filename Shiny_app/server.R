@@ -207,21 +207,21 @@ server <- function(input, output, session) {
     req(diffexp_data(), input$pathway_method)
     
     genes <- rownames(diffexp_data())
+    method <- input$pathway_method
+    species <- input$species
     
     if (is.null(genes) || length(genes) == 0) {
       showNotification("No genes found for pathway analysis", type = "error")
       return(NULL)
     }
     
-    method <- input$pathway_method
-    
     withProgress(message = 'Running Pathway Analysis', value = 0, {
-      result <- runPathwayAnalysis(genes, method)
+      result <- runPathwayAnalysis(genes, method, species)
       
       # Check if result is NULL
       if (is.null(result)) {
         showNotification("Pathway analysis failed, please check your input or connection.", type = "error")
-        return(NULL)  # Exit the event handler if the result is NULL
+        return(NULL)
       }
       
       output$pathway_results <- DT::renderDataTable({
