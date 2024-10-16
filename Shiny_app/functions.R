@@ -104,10 +104,16 @@ format_pval <- function(pval, threshold = 1e-6) {
   ifelse(pval < threshold, format(pval, scientific = TRUE, digits = 3), round(pval, 3))
 }
 
-convert_to_ensembl <- function(genes) {
+convert_to_ensembl <- function(genes, species) {
+  if(species == "Human"){
+    speciesDataset <- "hsapiens_gene_ensembl"
+  }
+  else if(species == "Mouse"){
+    speciesDataset <- "mmusculus_gene_ensembl"
+  }
   incProgress(0.2, detail = "Query of Ensembl IDs")
   mart <- tryCatch({
-    useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+    useMart("ensembl", dataset = speciesDataset)
   }, error = function(e) {
     showNotification("Cannot retrieve Mart, check your connection", type = "error")
     return(NULL)

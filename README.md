@@ -67,7 +67,7 @@ The app use these dependencies, but those should be automatically downloaded whe
 ## Roadmap
 
 ### Planned Features:
-- **Support for Other Species:** Add the ability to analyze datasets from species other than human and mouse.
+- <s>**Support for Other Species:** Add the ability to analyze datasets from species other than human and mouse.</s> DONE !
 - **FGSEA Integration:** Implement the FGSEA (Fast Gene Set Enrichment Analysis) method as an alternative pathway analysis option.
 - **Optimize Pathway Analysis:** Preload the gene annotation (using biomaRt) at the start to avoid reloading it with each new analysis, improving efficiency.
 - **Customizable Pathway Visualization:** Add an option to control the number of categories shown in the pathway analysis plots, with automatic height scaling to accommodate the chosen number.
