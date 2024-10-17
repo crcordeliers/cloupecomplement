@@ -61,7 +61,20 @@ ui <- dashboardPage(
           )
         ),
         actionButton("load_data", "Load Data"),
-        verbatimTextOutput("data_info")
+        verbatimTextOutput("data_info"),
+        
+        fluidRow(
+          box(
+            width = 12,
+            title = "Advanced",
+            solidHeader = TRUE,
+            status = "danger",
+            collapsible = TRUE,
+            collapsed = TRUE,
+            
+            actionButton("update_mart", "Update Mart")
+          )
+        )
       ),
       
       # Violin & Beeswarm Plots tab

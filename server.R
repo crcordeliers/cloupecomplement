@@ -49,6 +49,18 @@ server <- function(input, output, session) {
     }
   })
   
+  # Update the saved Mart file
+  observeEvent(input$update_mart, {
+    req(input$species)
+    withProgress(message = "Updating mart...", value = 0, {
+      incProgress(0.4, detail = "Loading mart...")
+
+      checkMart(input$species, updateMart = TRUE)
+      incProgress(0.4, detail = "Saving mart...")
+      Sys.sleep(1)
+    })
+  })
+  
   # Add a comparison to the list
   observeEvent(input$add_comparison, {
     req(input$comparison_select)
