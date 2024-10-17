@@ -39,7 +39,7 @@ ui <- dashboardPage(
                      fileInput("cluster_csv", "Choose Cluster CSV File", 
                                accept = ".csv", placeholder = "No file selected")
               )
-            ),
+            )
           )
         ),
         
