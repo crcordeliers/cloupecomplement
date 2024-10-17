@@ -1,4 +1,23 @@
-loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_gene_cutoff){
+checkMart <- function(species, updateMart = FALSE){
+  if(species == "Human"){
+    speciesDataset <- "hsapiens_gene_ensembl"
+    martFile <- "./data/humanMart.rds"
+  }
+  else if(species == "Mouse"){
+    speciesDataset <- "mmusculus_gene_ensembl"
+    martFile <- "./data/mouseMart.rds"
+  }
+  if (file.exists(martFile) & updateMart == FALSE) {
+    mart <- readRDS(martFile)
+  } 
+  else if (!file.exists(martFile) | updateMart == TRUE){
+    mart <- useMart("ensembl", dataset = speciesDataset)
+    saveRDS(mart, martFile)
+  }
+  return(mart)
+}
+
+loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_gene_cutoff, species){
   withProgress(message = "Loading data...", value = 0, {
     incProgress(0.1, detail = "Preparing data...")
     seuratObj <- Load10X_Spatial(folderCellRangerOut)
@@ -17,15 +36,17 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
     filtered_spots <- setdiff(colnames(seuratObj), spots_to_keep)
     seuratObj <- subset(seuratObj, cells = spots_to_keep)
     
-    incProgress(0.3, detail = "Normalizing the data...")
+    incProgress(0.4, detail = "Normalizing and scaling the data...")
     # Normalize and Scale the data
     seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
-    
-    incProgress(0.2, detail = "Scaling the data...")
     seuratObj <- ScaleData(seuratObj)
     
+    incProgress(0.1, detail = "Loading appropriate mart...")
+    mart <- checkMart(species)
+    
     # Return the filtered seurat object and the counts of filtered genes and spots
-    list(seuratObj = seuratObj, filtered_genes = length(filtered_genes), filtered_spots = length(filtered_spots))
+    return(list(seuratObj = seuratObj, filtered_genes = length(filtered_genes), 
+                filtered_spots = length(filtered_spots), mart = mart))
   })
 }
 
@@ -104,15 +125,7 @@ format_pval <- function(pval, threshold = 1e-6) {
   ifelse(pval < threshold, format(pval, scientific = TRUE, digits = 3), round(pval, 3))
 }
 
-convert_to_ensembl <- function(genes, species) {
-  if(species == "Human"){
-    speciesDataset <- "hsapiens_gene_ensembl"
-  }
-  else if(species == "Mouse"){
-    speciesDataset <- "mmusculus_gene_ensembl"
-  }
-  incProgress(0.2, detail = "Query of Ensembl IDs")
-  mart <- useMart("ensembl", dataset = speciesDataset)
+convert_to_ensembl <- function(genes, mart) {
   
   incProgress(0.2, detail = "Mapping Ensembl IDs to Symbol")
   gene_map <- getBM(filters = "hgnc_symbol", attributes = c("ensembl_gene_id", "hgnc_symbol"), values = genes, mart = mart)
@@ -122,14 +135,18 @@ convert_to_ensembl <- function(genes, species) {
   return(gene_map)
 }
 
-runPathwayAnalysis <- function(genes, method = "clusterProfiler", species) {
+runPathwayAnalysis <- function(genes, method = "clusterProfiler", species, mart) {
   incProgress(0.2, detail = "Running Pathway Analysis")
   
-  ensemblGenes <- convert_to_ensembl(genes, species)
+  ensemblGenes <- convert_to_ensembl(genes, mart)
   
   if (method == "clusterProfiler") {
     incProgress(0.2, detail = "Enrichment analysis using ClusterProfiler")
-    organismDB <- ifelse(species == "Human", "org.Hs.eg.db", "org.Mm.eg.db")
+    if(species == "Human"){
+      organismDB <- "org.Hs.eg.db"
+    } else if (species == "Mouse"){
+      organismDB <- "org.Mm.eg.db"
+    }
     result <- enrichGO(gene = ensemblGenes$ensembl_gene_id, OrgDb = organismDB,
                        keyType = "ENSEMBL", ont = "BP", pAdjustMethod = "BH")
   } else if (method == "fgsea") {

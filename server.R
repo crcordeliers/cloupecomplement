@@ -9,13 +9,14 @@ server <- function(input, output, session) {
   
   # Event to load data when the user clicks the load button
   observeEvent(input$load_data, {
-    req(input$cellranger_out, input$cluster_csv, input$gene_expression_cutoff, input$spot_gene_cutoff)
+    req(input$cellranger_out, input$cluster_csv, input$gene_expression_cutoff, input$spot_gene_cutoff, input$species)
     
     folderCellRangerOut <- input$cellranger_out
     filenameCluster <- input$cluster_csv$datapath
     
-    filter_results <- loadAndPreprocess(folderCellRangerOut, input$gene_expression_cutoff, input$spot_gene_cutoff)
+    filter_results <- loadAndPreprocess(folderCellRangerOut, input$gene_expression_cutoff, input$spot_gene_cutoff, input$species)
     data_loaded$seuratObj <- filter_results$seuratObj
+    data_loaded$mart <- filter_results$mart
     data_loaded$clusterMat <- loadClusterMat(filenameCluster, data_loaded$seuratObj)
     data_loaded$seuratObj[[]]["clusterMat"] <- data_loaded$clusterMat
     
@@ -204,11 +205,12 @@ server <- function(input, output, session) {
   
   # Run pathway analysis
   observeEvent(input$run_pathway, {
-    req(diffexp_data(), input$pathway_method)
+    req(diffexp_data(), input$pathway_method, input$species, data_loaded$mart)
     
     genes <- rownames(diffexp_data())
     method <- input$pathway_method
     species <- input$species
+    mart <- data_loaded$mart
     
     if (is.null(genes) || length(genes) == 0) {
       showNotification("No genes found for pathway analysis", type = "error")
@@ -216,7 +218,7 @@ server <- function(input, output, session) {
     }
     
     withProgress(message = 'Running Pathway Analysis', value = 0, {
-      result <- runPathwayAnalysis(genes, method, species)
+      result <- runPathwayAnalysis(genes, method, species, mart)
       
       # Check if result is NULL
       if (is.null(result)) {

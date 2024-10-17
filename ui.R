@@ -4,6 +4,8 @@ pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
                org.Hs.eg.db, biomaRt, fgsea)
 
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
 ui <- dashboardPage(
   dashboardHeader(title = "cLoupeComplement"),
   dashboardSidebar(
