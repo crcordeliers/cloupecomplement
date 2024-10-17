@@ -112,16 +112,12 @@ convert_to_ensembl <- function(genes, species) {
     speciesDataset <- "mmusculus_gene_ensembl"
   }
   incProgress(0.2, detail = "Query of Ensembl IDs")
-  mart <- tryCatch({
-    useMart("ensembl", dataset = speciesDataset)
-  }, error = function(e) {
-    showNotification("Cannot retrieve Mart, check your connection", type = "error")
-    return(NULL)
-  })
+  mart <- useMart("ensembl", dataset = speciesDataset)
   
   incProgress(0.2, detail = "Mapping Ensembl IDs to Symbol")
   gene_map <- getBM(filters = "hgnc_symbol", attributes = c("ensembl_gene_id", "hgnc_symbol"), values = genes, mart = mart)
-  gene_map <- gene_map %>% distinct(hgnc_symbol, .keep_all = TRUE)
+  gene_map <- as.data.frame(gene_map)
+  gene_map <- gene_map %>% dplyr::distinct(hgnc_symbol, .keep_all = TRUE)
   
   return(gene_map)
 }
@@ -131,14 +127,10 @@ runPathwayAnalysis <- function(genes, method = "clusterProfiler", species) {
   
   ensemblGenes <- convert_to_ensembl(genes, species)
   
-  if (is.null(ensemblGenes)) {
-    showNotification("ensembl genes are NULL", type = "error")
-    return(NULL)
-  }
-  
   if (method == "clusterProfiler") {
     incProgress(0.2, detail = "Enrichment analysis using ClusterProfiler")
-    result <- enrichGO(gene = ensemblGenes$ensembl_gene_id, OrgDb = org.Hs.eg.db,
+    organismDB <- ifelse(species == "Human", "org.Hs.eg.db", "org.Mm.eg.db")
+    result <- enrichGO(gene = ensemblGenes$ensembl_gene_id, OrgDb = organismDB,
                        keyType = "ENSEMBL", ont = "BP", pAdjustMethod = "BH")
   } else if (method == "fgsea") {
     incProgress(0.2, detail = "Enrichment analysis using fgsea")

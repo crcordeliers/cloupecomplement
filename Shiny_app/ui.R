@@ -221,7 +221,7 @@ ui <- dashboardPage(
                     fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
                   ),
                   
-                  selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler")),
+                  selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler", "fgsea")),
                   actionButton("run_pathway", "Run Analysis", class = "btn-primary")
                 ),
                 
