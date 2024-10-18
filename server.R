@@ -6,6 +6,7 @@ server <- function(input, output, session) {
   data_loaded <- reactiveValues(seuratObj = NULL, clusterMat = NULL)
   comparisons <- reactiveVal(list())
   diffexp_results <- reactiveVal(data.frame())
+  pathway_result <- reactiveVal(NULL)
   
   # Event to load data when the user clicks the load button
   observeEvent(input$load_data, {
@@ -217,12 +218,14 @@ server <- function(input, output, session) {
   
   # Run pathway analysis
   observeEvent(input$run_pathway, {
-    req(diffexp_data(), input$pathway_method, input$species, data_loaded$mart)
+    req(diffexp_data(), input$pathway_method, input$species, data_loaded$mart,
+        input$selected_cluster)
     
     genes <- rownames(diffexp_data())
     method <- input$pathway_method
     species <- input$species
     mart <- data_loaded$mart
+    chosenCluster <- input$selected_cluster
     
     if (is.null(genes) || length(genes) == 0) {
       showNotification("No genes found for pathway analysis", type = "error")
@@ -231,6 +234,7 @@ server <- function(input, output, session) {
     
     withProgress(message = 'Running Pathway Analysis', value = 0, {
       result <- runPathwayAnalysis(genes, method, species, mart)
+      pathway_result(result) 
       
       incProgress(0.1, detail = "Rendering Data table")
       output$pathway_results <- DT::renderDataTable({
@@ -240,13 +244,14 @@ server <- function(input, output, session) {
       
       incProgress(0.1, detail = "Rendering plots")
       output$pathway_plot <- renderPlot({
-        if (method == "clusterProfiler") {
+        if (method == "Gene Ontology") {
           if (inherits(result, "enrichResult")) {
-            dotplot(result, showCategory = 20)
+            dotplot(result, showCategory = 20) +
+              ggtitle(paste0(method, " : ", chosenCluster, " vs all"))
           } else {
             plot(1, 1, main = "Error: Result not compatible")
           }
-        } else if (method == "fgsea") {
+        } else if (method == "FGSEA") {
           if ("NES" %in% colnames(result)) {
             ggplot(result, aes(x = reorder(pathway, NES), y = NES)) +
               geom_bar(stat = "identity") +
@@ -265,29 +270,30 @@ server <- function(input, output, session) {
       paste("pathway_analysis_plot_", Sys.Date(), ".pdf", sep = "")
     },
     content = function(file) {
-      pdf(file, width = 8, height = 6)
+      pdf(file, width = 6, height = 9)
       
-      if (input$pathway_method == "clusterProfiler") {
-        result <- runPathwayAnalysis(rownames(diffexp_data()), input$pathway_method)
-        if (inherits(result, "enrichResult")) {
-          barplot(result, showCategory = 20)
-        } else {
-          plot(1, 1, main = "Error: Result not compatible with barplot")
-        }
-      } else if (input$pathway_method == "fgsea") {
-        result <- runPathwayAnalysis(rownames(diffexp_data()), input$pathway_method)
-        if ("NES" %in% colnames(result)) {
-          ggplot(result, aes(x = reorder(pathway, NES), y = NES)) +
+      result <- pathway_result()
+      
+      if (!is.null(result)) {
+        if (input$pathway_method == "Gene Ontology") {
+          p <- dotplot(result, showCategory = 20)
+          print(p)
+        } else if (input$pathway_method == "FGSEA") {
+          p <- ggplot(result, aes(x = reorder(pathway, NES), y = NES)) +
             geom_bar(stat = "identity") +
             coord_flip()
+          print(p)
         } else {
-          plot(1, 1, main = "Error: Result not compatible with barplot")
+          plot(1, 1, main = "Error: Result not compatible with plot")
         }
+      } else {
+        plot(1, 1, main = "Error: Result is NULL")
       }
       
       dev.off()
     }
   )
+  
   
   # Download Pathway Data Table as CSV
   output$download_pathway_data_csv <- downloadHandler(
@@ -295,8 +301,10 @@ server <- function(input, output, session) {
       paste("pathway_analysis_data_", Sys.Date(), ".csv", sep = "")
     },
     content = function(file) {
-      result <- runPathwayAnalysis(rownames(diffexp_data()), input$pathway_method)
-      write.csv(as.data.frame(result), file, row.names = FALSE)
+      result <- pathway_result()
+      if (!is.null(result)) {
+        write.csv(as.data.frame(result), file, row.names = FALSE)
+      }
     }
   )
 }

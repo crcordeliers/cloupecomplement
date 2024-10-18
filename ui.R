@@ -236,7 +236,8 @@ ui <- dashboardPage(
                     fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
                   ),
                   
-                  selectInput("pathway_method", "Select Method:", choices = c("clusterProfiler", "fgsea")),
+                  selectInput("pathway_method", "Select Method:", choices = c("Gene Ontology", "FGSEA"),
+                              selected = "FGSEA"),
                   actionButton("run_pathway", "Run Analysis", class = "btn-primary")
                 ),
                 
@@ -255,14 +256,15 @@ ui <- dashboardPage(
                       value = "plot",
                       br(),
                       downloadButton("download_pathway_plot_pdf", "Download Pathway Plot as PDF"),
+                      br(),br(),
                       plotOutput("pathway_plot", height="700px")
                     ),
                     
                     tabPanel(
                       title = "Data Table", 
                       value = "table",
-                      br(),
                       downloadButton("download_pathway_data_csv", "Download Pathway Data Table as CSV"),
+                      br(),br(),
                       DT::dataTableOutput("pathway_results")
                     )
                   )

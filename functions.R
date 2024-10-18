@@ -135,13 +135,13 @@ convert_to_ensembl <- function(genes, mart) {
   return(gene_map)
 }
 
-runPathwayAnalysis <- function(genes, method = "clusterProfiler", species, mart) {
+runPathwayAnalysis <- function(genes, method = "Gene Ontology", species, mart) {
   incProgress(0.1, detail = "Running Pathway Analysis")
   
   ensemblGenes <- convert_to_ensembl(genes, mart)
   
-  if (method == "clusterProfiler") {
-    incProgress(0.1, detail = "Enrichment analysis using ClusterProfiler")
+  if (method == "Gene Ontology") {
+    incProgress(0.1, detail = "Enrichment analysis using Gene Ontology")
     if(species == "Human"){
       organismDB <- "org.Hs.eg.db"
     } else if (species == "Mouse"){
@@ -149,8 +149,8 @@ runPathwayAnalysis <- function(genes, method = "clusterProfiler", species, mart)
     }
     result <- enrichGO(gene = ensemblGenes$ensembl_gene_id, OrgDb = organismDB,
                        keyType = "ENSEMBL", ont = "BP", pAdjustMethod = "BH")
-  } else if (method == "fgsea") {
-    incProgress(0.1, detail = "Enrichment analysis using fgsea")
+  } else if (method == "FGSEA") {
+    incProgress(0.1, detail = "Enrichment analysis using FGSEA")
     pathways <- fgsea::examplePathways
     ranks <- stats::rnorm(length(ensemblGenes))
     names(ranks) <- ensemblGenes
