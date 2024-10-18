@@ -232,17 +232,13 @@ server <- function(input, output, session) {
     withProgress(message = 'Running Pathway Analysis', value = 0, {
       result <- runPathwayAnalysis(genes, method, species, mart)
       
-      # Check if result is NULL
-      if (is.null(result)) {
-        showNotification("Pathway analysis failed, please check your input or connection.", type = "error")
-        return(NULL)
-      }
-      
+      incProgress(0.1, detail = "Rendering Data table")
       output$pathway_results <- DT::renderDataTable({
         resultDt <- as.data.frame(result)
         DT::datatable(resultDt, options = list(pageLength = 20))
       })
       
+      incProgress(0.1, detail = "Rendering plots")
       output$pathway_plot <- renderPlot({
         if (method == "clusterProfiler") {
           if (inherits(result, "enrichResult")) {
