@@ -2,7 +2,7 @@ if (!require("BiocManager")) install.packages("BiocManager", quiet = TRUE)
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
-               org.Hs.eg.db, biomaRt, fgsea)
+               org.Hs.eg.db, biomaRt, fgsea, msigdbr)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -236,7 +236,9 @@ ui <- dashboardPage(
                     fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
                   ),
                   
-                  selectInput("pathway_method", "Select Method:", choices = c("Gene Ontology", "FGSEA"),
+                  selectInput("pathway_method", "Select Method:", choices = c("ORA", "FGSEA"),
+                              selected = "FGSEA"),
+                  selectInput("pathway_database", "Select Database:", choices = c("GO", "KEGG", "HALLMARK"),
                               selected = "FGSEA"),
                   actionButton("run_pathway", "Run Analysis", class = "btn-primary")
                 ),

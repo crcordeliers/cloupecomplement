@@ -219,21 +219,17 @@ server <- function(input, output, session) {
   # Run pathway analysis
   observeEvent(input$run_pathway, {
     req(diffexp_data(), input$pathway_method, input$species, data_loaded$mart,
-        input$selected_cluster)
+        input$selected_cluster, input$pathway_database)
     
-    genes <- rownames(diffexp_data())
+    genes <- diffexp_data()
     method <- input$pathway_method
     species <- input$species
     mart <- data_loaded$mart
     chosenCluster <- input$selected_cluster
-    
-    if (is.null(genes) || length(genes) == 0) {
-      showNotification("No genes found for pathway analysis", type = "error")
-      return(NULL)
-    }
+    database <- input$pathway_database
     
     withProgress(message = 'Running Pathway Analysis', value = 0, {
-      result <- runPathwayAnalysis(genes, method, species, mart)
+      result <- runPathwayAnalysis(genes, method, database, species, mart)
       pathway_result(result) 
       
       incProgress(0.1, detail = "Rendering Data table")
@@ -244,22 +240,21 @@ server <- function(input, output, session) {
       
       incProgress(0.1, detail = "Rendering plots")
       output$pathway_plot <- renderPlot({
-        if (method == "Gene Ontology") {
-          if (inherits(result, "enrichResult")) {
-            dotplot(result, showCategory = 20) +
-              ggtitle(paste0(method, " : ", chosenCluster, " vs all"))
-          } else {
-            plot(1, 1, main = "Error: Result not compatible")
-          }
-        } else if (method == "FGSEA") {
-          if ("NES" %in% colnames(result)) {
-            ggplot(result, aes(x = reorder(pathway, NES), y = NES)) +
-              geom_bar(stat = "identity") +
-              coord_flip()
-          } else {
-            plot(1, 1, main = "Error: Result not compatible with barplot")
-          }
-        }
+        dotplot(result, showCategory = 30) +
+          ggtitle(paste0(method, " method on ", database, " in ", species)) +
+          theme(
+            plot.title = element_text(size = 12, face = "bold"),
+            axis.text.y = element_text(size = 10),
+            axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+            axis.title.x = element_text(size = 12),
+            axis.title.y = element_text(size = 12),
+            panel.background = element_blank(),
+            panel.grid.major = element_line(colour = "gray90")
+          ) +
+          scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 50))
+        
+        dotplot(result, showCategory = 20) +
+          ggtitle(paste0(method, " : ", chosenCluster, " vs all"))
       })
     })
   })

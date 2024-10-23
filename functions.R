@@ -125,39 +125,82 @@ format_pval <- function(pval, threshold = 1e-6) {
   ifelse(pval < threshold, format(pval, scientific = TRUE, digits = 3), round(pval, 3))
 }
 
-convert_to_ensembl <- function(genes, mart) {
+requestGeneTable <- function(mart, species){
+  full_gene_map <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "entrezgene_id"),
+                         mart = mart)
+  saveRDS(full_gene_map, paste0("./data/", tolower(species), "GeneTable.rds"))
+}
+
+convertGeneMap <- function(genes, mart, species){
+  genes <- rownames(genes)
   
-  incProgress(0.2, detail = "Mapping Ensembl IDs to Symbol")
-  gene_map <- getBM(filters = "hgnc_symbol", attributes = c("ensembl_gene_id", "hgnc_symbol"), values = genes, mart = mart)
-  gene_map <- as.data.frame(gene_map)
-  gene_map <- gene_map %>% dplyr::distinct(hgnc_symbol, .keep_all = TRUE)
+  tryCatch({
+    full_gene_map <- readRDS(paste0("./data/", tolower(species), "GeneTable.rds"))
+  }, error = function(e) {
+    message("Gene table not found. Creating the table...")
+    requestGeneTable(mart, species)
+    full_gene_map <- readRDS(paste0("./data/", tolower(species), "GeneTable.rds"))
+  })
+  
+  gene_map <- full_gene_map %>% 
+    dplyr::filter(hgnc_symbol %in% genes) %>%
+    dplyr::distinct(hgnc_symbol, .keep_all = TRUE)
   
   return(gene_map)
 }
 
-runPathwayAnalysis <- function(genes, method = "Gene Ontology", species, mart) {
+runPathwayAnalysis <- function(genes, method, database, species, mart) {
   incProgress(0.1, detail = "Running Pathway Analysis")
   
-  ensemblGenes <- convert_to_ensembl(genes, mart)
+  # Convert genes to Ensembl format
+  gene_map <- convertGeneMap(genes, mart, species)
   
-  if (method == "Gene Ontology") {
-    incProgress(0.1, detail = "Enrichment analysis using Gene Ontology")
-    if(species == "Human"){
-      organismDB <- "org.Hs.eg.db"
-    } else if (species == "Mouse"){
-      organismDB <- "org.Mm.eg.db"
-    }
-    result <- enrichGO(gene = ensemblGenes$ensembl_gene_id, OrgDb = organismDB,
-                       keyType = "ENSEMBL", ont = "BP", pAdjustMethod = "BH")
+  # Set species database for GO terms
+  go_species <- ifelse(species == "Human", "org.Hs.eg.db", "org.Mm.eg.db")
+  
+  # ORA method
+  if (method == "ORA") {
+    gene_list <- rownames(genes)
+    hallmark_gene_sets <- msigdbr(species = "Mus musculus", category = "H")
+    hallmark_gene_list <- hallmark_gene_sets |>
+      dplyr::select(gs_name, entrez_gene)
+    
+    # Enrichment based on the selected database
+    result <- switch(database,
+                     GO = enrichGO(gene = gene_map$ensembl_gene_id,
+                                   OrgDb = go_species,
+                                   keyType = "ENSEMBL",
+                                   ont = "BP",
+                                   pAdjustMethod = "BH",
+                                   pvalueCutoff = 0.05,
+                                   qvalueCutoff = 0.2),
+                     KEGG = enrichKEGG(gene = gene_map$entrezgene_id,
+                                       organism = ifelse(species == "Human", "hsa", "mmu"),
+                                       pvalueCutoff = 0.05),
+                     HALLMARK = enricher(gene = gene_map$ensembl_gene_id,
+                                         TERM2GENE = hallmark_gene_list,
+                                         pAdjustMethod = "BH",
+                                         pvalueCutoff = 0.05),
+                     stop("Unsupported database"))
+    
+    # FGSEA method
   } else if (method == "FGSEA") {
-    incProgress(0.1, detail = "Enrichment analysis using FGSEA")
-    pathways <- fgsea::examplePathways
-    ranks <- stats::rnorm(length(ensemblGenes))
-    names(ranks) <- ensemblGenes
-    result <- fgsea(pathways = pathways, stats = ranks, minSize = 15, maxSize = 500)
+    ranks <- sort(genes$stat, decreasing = TRUE)
+    pathway_db <- switch(database,
+                         GO = msigdbr(species = tolower(species), category = "C5"),
+                         KEGG = msigdbr(species = tolower(species), category = "C2", subcategory = "KEGG"),
+                         HALLMARK = msigdbr(species = tolower(species), category = "H"),
+                         stop("Unsupported database"))
+    
+    result <- fgsea(pathways = pathway_db,
+                    stats = ranks,
+                    minSize = 15,
+                    maxSize = 500,
+                    nperm = 1000)
+    
+  } else {
+    stop("Unsupported method")
   }
-  
-  incProgress(0.1, detail = "Rendering plots & data table")
   
   return(result)
 }
