@@ -260,7 +260,7 @@ server <- function(input, output, session) {
       incProgress(0.1, detail = "Rendering plots")
       output$pathway_plot <- renderPlot({
         dotplot(result, showCategory = 30) +
-          ggtitle(paste0(method, " method on ", database, " in ", species)) +
+          ggtitle(paste0(method, " method on ", database, " database in ", species, " : ", chosenCluster, " vs all")) +
           theme(
             plot.title = element_text(size = 12, face = "bold"),
             axis.text.y = element_text(size = 10),
@@ -271,9 +271,6 @@ server <- function(input, output, session) {
             panel.grid.major = element_line(colour = "gray90")
           ) +
           scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 50))
-        
-        dotplot(result, showCategory = 20) +
-          ggtitle(paste0(method, " : ", chosenCluster, " vs all"))
       })
     })
   })

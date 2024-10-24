@@ -154,20 +154,26 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
   
   # Convert genes to Ensembl format
   gene_map <- convertGeneMap(genes, mart, species)
+  genes <- merge(genes, gene_map, by.x = "row.names", by.y = "hgnc_symbol")
+
   
   # Set species database for GO terms
   go_species <- ifelse(species == "Human", "org.Hs.eg.db", "org.Mm.eg.db")
+  if(database == "HALLMARK"){
+    hallmark_gene_sets <- msigdbr(species = tolower(species), category = "H")
+    hallmark_gene_list <- hallmark_gene_sets |>
+      dplyr::select(gs_name, entrez_gene)
+  }
   
   # ORA method
   if (method == "ORA") {
-    gene_list <- rownames(genes)
-    hallmark_gene_sets <- msigdbr(species = "Mus musculus", category = "H")
-    hallmark_gene_list <- hallmark_gene_sets |>
-      dplyr::select(gs_name, entrez_gene)
+    gene_list <- genes |>
+      filter(p_val_adj <= 0.05)
+    print(gene_list)
     
     # Enrichment based on the selected database
     result <- switch(database,
-                     GO = enrichGO(gene = gene_map$ensembl_gene_id,
+                     GO = enrichGO(gene = gene_list$ensembl_gene_id,
                                    OrgDb = go_species,
                                    keyType = "ENSEMBL",
                                    ont = "BP",
@@ -177,7 +183,7 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
                      KEGG = enrichKEGG(gene = gene_map$entrezgene_id,
                                        organism = ifelse(species == "Human", "hsa", "mmu"),
                                        pvalueCutoff = 0.05),
-                     HALLMARK = enricher(gene = gene_map$ensembl_gene_id,
+                     HALLMARK = enricher(gene = gene_map$entrezgene_id,
                                          TERM2GENE = hallmark_gene_list,
                                          pAdjustMethod = "BH",
                                          pvalueCutoff = 0.05),
@@ -185,18 +191,30 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
     
     # FGSEA method
   } else if (method == "FGSEA") {
-    ranks <- sort(genes$stat, decreasing = TRUE)
-    pathway_db <- switch(database,
-                         GO = msigdbr(species = tolower(species), category = "C5"),
-                         KEGG = msigdbr(species = tolower(species), category = "C2", subcategory = "KEGG"),
-                         HALLMARK = msigdbr(species = tolower(species), category = "H"),
-                         stop("Unsupported database"))
+    genes_sorted <- genes |>
+      dplyr::arrange(desc(avg_log2FC))
+    genes_sorted$hgnc_symbol <- rownames(genes_sorted)
+    genes_sorted <- merge(genes_sorted, gene_map, by = "hgnc_symbol", by.y = "entrezgene_id")
+    genes_sorted <- genes_sorted[!is.na(genes_sorted$entrezgene_id),]
+
+    ranks <- as.numeric(genes_sorted$avg_log2FC)
+    names(ranks) <- genes_sorted$entrezgene_id
+    ranks <- sort(ranks, decreasing = TRUE)
+    ranks <- ranks[!duplicated(names(ranks))]
     
-    result <- fgsea(pathways = pathway_db,
-                    stats = ranks,
-                    minSize = 15,
-                    maxSize = 500,
-                    nperm = 1000)
+    result <- switch(database,
+                         GO = gseGO(geneList = ranks,
+                           OrgDb = go_species,
+                           ont = "BP",
+                           pvalueCutoff = 1),
+                         KEGG = gseKEGG(geneList = ranks,
+                                        keyType = "ncbi-geneid",
+                                        organism = ifelse(species == "Human", "hsa", "mmu"),
+                                        pvalueCutoff = 1),
+                         HALLMARK = GSEA(ranks, 
+                                         TERM2GENE = hallmark_gene_list,
+                                         pvalueCutoff = 1),
+                         stop("Unsupported database"))
     
   } else {
     stop("Unsupported method")

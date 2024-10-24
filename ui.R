@@ -244,9 +244,9 @@ ui <- dashboardPage(
                   ),
                   
                   selectInput("pathway_method", "Select Method:", choices = c("ORA", "FGSEA"),
-                              selected = "FGSEA"),
+                              selected = "ORA"),
                   selectInput("pathway_database", "Select Database:", choices = c("GO", "KEGG", "HALLMARK"),
-                              selected = "FGSEA"),
+                              selected = "GO"),
                   actionButton("run_pathway", "Run Analysis", class = "btn-primary")
                 ),
                 
