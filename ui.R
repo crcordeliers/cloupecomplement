@@ -72,7 +72,14 @@ ui <- dashboardPage(
             collapsible = TRUE,
             collapsed = TRUE,
             
-            actionButton("update_mart", "Update Mart")
+            fluidRow(
+              column(6,
+                     actionButton("update_mart", "Update Mart")
+                     ),
+              column(6,
+                     actionButton("update_gene_table", "Update Gene Table")
+              )
+            )
           )
         )
       ),

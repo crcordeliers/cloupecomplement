@@ -62,6 +62,25 @@ server <- function(input, output, session) {
     })
   })
   
+  #Update the saved Gene Table
+  observeEvent(input$update_gene_table, {
+    req(input$species)
+    
+    withProgress(message = "Updating gene table...", value = 0, {
+      incProgress(0.4, detail = "Querying gene table...")
+      mart <- checkMart(input$species)
+
+      if(!is.null(mart)) {
+        requestGeneTable(mart, input$species)
+      } else {
+        showNotification("Failed to load the mart", type = "error")
+      }
+      
+      incProgress(0.4, detail = "Saving gene table...")
+      Sys.sleep(0.2)
+    })
+  })
+  
   # Add a comparison to the list
   observeEvent(input$add_comparison, {
     req(input$comparison_select)
