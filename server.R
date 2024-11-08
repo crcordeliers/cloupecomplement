@@ -5,6 +5,7 @@ server <- function(input, output, session) {
   # Reactive values for loaded data and comparisons
   data_loaded <- reactiveValues(seuratObj = NULL, clusterMat = NULL)
   comparisons <- reactiveVal(list())
+  diffexp_all <- reactiveVal(NULL)
   diffexp_results <- reactiveVal(data.frame())
   pathway_result <- reactiveVal(NULL)
   
@@ -27,10 +28,13 @@ server <- function(input, output, session) {
     ordered_genes <- names(sort(gene_expression_sums, decreasing = TRUE))
     
     sorted_clusters <- sort(unique(data_loaded$clusterMat[,1]))
+    print(head(sorted_clusters))
     updateSelectizeInput(session, "gene_select", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "gene_select_dotplot", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
     updateSelectizeInput(session, "selected_cluster", choices = sorted_clusters, selected = sorted_clusters[1])
+    
+    diffexp_all(FindAllMarkers(data_loaded$seuratObj))
     
     # Update the filtered out information
     output$data_info <- renderPrint({
@@ -193,10 +197,13 @@ server <- function(input, output, session) {
   
   # diffexp
   observeEvent(input$selected_cluster, {
-    req(data_loaded$seuratObj, input$selected_cluster)
+    req(data_loaded$seuratObj, input$selected_cluster, diffexp_all())
     
     selected_cluster <- input$selected_cluster
-    diffexp <- FindMarkers(data_loaded$seuratObj, ident.1 = selected_cluster, ident.2 = NULL)
+    
+    diffexp <- diffexp_all() |>
+      filter(str_detect(cluster, selected_cluster)) |>
+      dplyr::select(-contains("cluster"))
     
     if ("p_val" %in% colnames(diffexp)) {
       diffexp$p_val <- format_pval(diffexp$p_val)
@@ -233,6 +240,30 @@ server <- function(input, output, session) {
       req(diffexp_results)
       return(diffexp_results())
     }
+  })
+  
+  # Cell type enrichment
+  observeEvent(diffexp_data(), {
+    genes <- diffexp_data()
+    Cell_marker <- read_xlsx("./data/Cell_marker_All.xlsx")
+    
+    pheno  <- Cell_marker |>
+      filter(str_detect(species, input$species)) |>
+      mutate(Symbol = if_else(is.na(Symbol), marker, Symbol)) |>
+      filter(!is.na(Symbol)) |>
+      distinct() |>
+      pull(cell_name, Symbol)
+    
+    # genes_sorted <- genes |>
+    #   dplyr::arrange(desc(avg_log2FC))
+    # genes_sorted$hgnc_symbol <- rownames(genes_sorted)
+    # genes_sorted <- merge(genes_sorted, gene_map, by = "hgnc_symbol", by.y = "entrezgene_id")
+    # genes_sorted <- genes_sorted[!is.na(genes_sorted$entrezgene_id),]
+    # 
+    # ranks <- as.numeric(genes_sorted$avg_log2FC)
+    # names(ranks) <- genes_sorted$entrezgene_id
+    # ranks <- sort(ranks, decreasing = TRUE)
+    # ranks <- ranks[!duplicated(names(ranks))]
   })
   
   # Run pathway analysis

@@ -43,7 +43,7 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
     
     incProgress(0.1, detail = "Loading appropriate mart...")
     mart <- checkMart(species)
-    
+
     # Return the filtered seurat object and the counts of filtered genes and spots
     return(list(seuratObj = seuratObj, filtered_genes = length(filtered_genes), 
                 filtered_spots = length(filtered_spots), mart = mart))

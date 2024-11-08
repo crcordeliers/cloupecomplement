@@ -2,7 +2,7 @@ if (!require("BiocManager")) install.packages("BiocManager", quiet = TRUE)
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
-               org.Hs.eg.db, biomaRt, fgsea, msigdbr)
+               org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
