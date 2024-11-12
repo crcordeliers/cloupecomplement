@@ -2,7 +2,7 @@ if (!require("BiocManager")) install.packages("BiocManager", quiet = TRUE)
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
-               org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse)
+               org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -11,9 +11,10 @@ ui <- dashboardPage(
   dashboardSidebar(
     sidebarMenu(
       menuItem("Data Loading", tabName = "data_loading", icon = icon("upload")),
-      menuItem("Violin & Beeswarm Plots", tabName = "plots", icon = icon("chart-simple")),
+      menuItem("Violin & Beeswarm Plots", tabName = "VB_plots", icon = icon("chart-simple")),
       menuItem("Heatmap & Dotplots", tabName = "hmap_dotplot", icon = icon("chart-bar")),
       menuItem("Diffexp", tabName = "diffexp", icon = icon("table")),
+      menuItem("Celltype Enrichment", tabName = "celltype_enrichment"),
       menuItem("Pathway Analysis", tabName = "pathway_analysis", icon = icon("dna"))
     )
   ),
@@ -85,7 +86,7 @@ ui <- dashboardPage(
       ),
       
       # Violin & Beeswarm Plots tab
-      tabItem(tabName = "plots",
+      tabItem(tabName = "VB_plots",
               h2("Violin & Beeswarm Plots"),
               
               # download buttons
@@ -222,6 +223,32 @@ ui <- dashboardPage(
             status = "primary",
             
             DT::dataTableOutput("diffexp_table")
+          )
+        )
+      ),
+      
+      # Cell Type Enrichment Analysis tab
+      tabItem(
+        tabName = "celltype_enrichment",
+        h2("Cell Type Enrichment Analysis"),
+        
+        # Download button for enrichment analysis results
+        fluidRow(
+          column(6, 
+                 downloadButton("download_enrichment_pdf", "Download Enrichment as PDF"))
+        ),
+        br(),
+        
+        # Display FGSEA enrichment plots by cluster
+        fluidRow(
+          box(
+            width = 12,
+            title = "FGSEA Cell Type Enrichment Results",
+            solidHeader = TRUE,
+            status = "primary",
+            
+            # This will display a separate barplot for each cluster's FGSEA result
+            uiOutput("fgsea_barplots")
           )
         )
       ),

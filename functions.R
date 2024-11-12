@@ -142,8 +142,8 @@ convertGeneMap <- function(genes, mart, species){
     full_gene_map <- readRDS(paste0("./data/", tolower(species), "GeneTable.rds"))
   })
   
-  gene_map <- full_gene_map %>% 
-    dplyr::filter(hgnc_symbol %in% genes) %>%
+  gene_map <- full_gene_map |>
+    dplyr::filter(hgnc_symbol %in% genes) |>
     dplyr::distinct(hgnc_symbol, .keep_all = TRUE)
   
   return(gene_map)
