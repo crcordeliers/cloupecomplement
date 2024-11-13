@@ -34,8 +34,6 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
     updateSelectizeInput(session, "selected_cluster", choices = sorted_clusters, selected = sorted_clusters[1])
     
-    diffexp_all(FindAllMarkers(data_loaded$seuratObj))
-    
     # Update the filtered out information
     output$data_info <- renderPrint({
       cat("Seurat Object Dimensions:", dim(data_loaded$seuratObj), "\n")
@@ -43,6 +41,9 @@ server <- function(input, output, session) {
       cat("Filtered out genes:", filter_results$filtered_genes, "\n")
       cat("Filtered out spots:", filter_results$filtered_spots, "\n")
     })
+    
+    # Pre-calculate diffexp results while user is busy looking at something else
+    diffexp_all(FindAllMarkers(data_loaded$seuratObj))
   })
   
   output$data_info <- renderPrint({
@@ -242,93 +243,114 @@ server <- function(input, output, session) {
     }
   })
   
-  # Cell type enrichment
-  observeEvent(diffexp_all(), {
-    req(diffexp_all(), data_loaded$mart, input$species)
-    genes <- diffexp_all()
-    gene_map <- convertGeneMap(genes, data_loaded$mart, input$species)
-    Cell_marker <- read_xlsx("./data/Cell_marker_All.xlsx")
-    
-    pathways  <- Cell_marker |>
-      filter(str_detect(species, input$species)) |>
-      filter(!is.na(Symbol)) |>
-      distinct() |>
-      pull(Symbol, cell_name)
-    pathways <- split(pathways, names(pathways ))
-    
-    genes_sorted <- genes |>
-      dplyr::arrange(cluster, desc(avg_log2FC))
-
-    # genes_sorted <- merge(genes_sorted, gene_map, by.x = "row.names", by.y = "hgnc_symbol")
-    # genes_sorted <- genes_sorted[!is.na(genes_sorted$entrezgene_id),]
-
-    fgsea_results <- list()
-    barplots_celltype <- list()
-    
-    for (clust in unique(genes_sorted$cluster)) {
-      cluster_genes <- genes_sorted[genes_sorted$cluster == clust, ]
+  observeEvent(input$run_ct_enrichment, {
+    withProgress(message = "Running Cell Type Enrichment Analysis...", value = 0, {
+      req(diffexp_all(), data_loaded$mart, input$species, input$celltype_method, input$celltype_db)
       
-      clust_ranks <- as.numeric(cluster_genes$avg_log2FC)
-      names(clust_ranks) <- rownames(cluster_genes)
+      # Load and prepare data
+      genes <- diffexp_all()
+      gene_map <- convertGeneMap(genes, data_loaded$mart, input$species)
+      Cell_marker <- read_xlsx("./data/Cell_marker_All.xlsx")
       
-      clust_ranks <- sort(clust_ranks, decreasing = TRUE)
-      clust_ranks <- clust_ranks[!duplicated(names(clust_ranks))]
+      pathways  <- Cell_marker |>
+        filter(str_detect(species, input$species)) |>
+        filter(!is.na(Symbol)) |>
+        distinct() |>
+        pull(Symbol, cell_name)
+      pathways <- split(pathways, names(pathways))
       
-      fgsea_output <- as.data.frame(fgsea::fgsea(pathways = pathways,
-                                   stats = clust_ranks))
-      enrichr_output <- enrichR::enrichr(cluster_genes, databases = "CellMarker_2024")
-      fgsea_results[[as.character(clust)]] <- fgsea_output |>
-        dplyr::filter(NES >= 0)
+      genes_sorted <- genes |>
+        dplyr::mutate(cluster = factor(cluster, levels = paste("Cluster", sort(as.numeric(gsub("Cluster ", "", unique(cluster))))))) |>
+        dplyr::arrange(cluster, desc(avg_log2FC))
       
-      barplots_celltype[[as.character(clust)]] <- ggplot(head(fgsea_results[[as.character(clust)]], 10), 
-                                                         aes(x = reorder(pathway, padj, decreasing = TRUE), y = NES, fill = padj)) +
-        geom_bar(stat = "identity") +
-        coord_flip() +
-        scale_fill_gradient(
-          low = "blue", high = "yellow", name = "Adjusted p-value",
-          limits = c(0, 1)
-        ) +
-        labs(
-          x = "Cell Type",
-          y = "Normalized Enrichment Score (NES)",
-          title = paste0("FGSEA cell type enrichment on CellMarker 2024 database in ", input$species, " : ", clust)
-        ) +
-        theme_minimal() +
-        theme(
-          plot.title = element_text(size = 12, face = "bold"),
-          axis.text.y = element_text(size = 10),
-          axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
-          axis.title.x = element_text(size = 12),
-          axis.title.y = element_text(size = 12),
-          panel.background = element_blank(),
-          panel.grid.major = element_line(colour = "gray90")
-        ) +
-        scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 50))
-    }
-    
-    output$fgsea_barplots <- renderUI({
-      # Dynamically generate plot outputs for each cluster
-      plot_outputs <- lapply(names(barplots_celltype), function(clust) {
-        plotname <- paste0("fgsea_plot_", clust)
-        plotOutput(outputId = plotname, height = "400px")
-      })
-      do.call(tagList, plot_outputs)
-    })
-    
-    # Create a separate renderPlot for each barplot in fgsea_results
-    observe({
-      for (clust in names(barplots_celltype)) {
-        local({
-          cluster_name <- clust
-          output[[paste0("fgsea_plot_", cluster_name)]] <- renderPlot({
-            barplots_celltype[[cluster_name]]
-          })
-        })
+      enrichment_results <- list()
+      barplots_celltype <- list()
+      
+      # Number of clusters for progress calculation
+      total_clusters <- length(unique(genes_sorted$cluster))
+      cluster_progress_step <- 1 / total_clusters  # Calculate progress step per cluster
+      
+      for (clust in sort(unique(genes_sorted$cluster))) {
+        # Update progress for each cluster iteration
+        incProgress(cluster_progress_step, message = paste("Processing Cluster:", clust))
+        
+        cluster_genes <- genes_sorted[genes_sorted$cluster == clust, ]
+        clust_ranks <- setNames(as.numeric(cluster_genes$avg_log2FC), rownames(cluster_genes))
+        clust_ranks <- sort(clust_ranks[!duplicated(names(clust_ranks))], decreasing = TRUE)
+        
+        if(input$celltype_method == "FGSEA"){
+          enrichment_output <- as.data.frame(fgsea::fgsea(pathways = pathways, stats = clust_ranks))
+          enrichment_results[[as.character(clust)]] <- enrichment_output |>
+            dplyr::filter(NES >= 0)
+          
+          barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
+                                                             aes(x = reorder(pathway, padj, decreasing = TRUE), y = NES, fill = padj))
+        } else if(input$celltype_method == "Enrichr Web Query"){
+          enrichment_output <- enrichR::enrichr(names(clust_ranks), databases = input$celltype_db)
+          enrichment_results[[as.character(clust)]] <- as.data.frame(enrichment_output[[1]])
+          barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
+                                                             aes(x = reorder(Term, Adjusted.P.value, decreasing = TRUE), y = Combined.Score, fill = Adjusted.P.value))
+        }
+        
+        barplots_celltype[[as.character(clust)]] <- barplots_celltype[[as.character(clust)]] +
+          geom_bar(stat = "identity") +
+          coord_flip() +
+          scale_fill_gradient(low = "midnightblue", high = "tan1", name = "Adjusted p-value", limits = c(0, 1)) +
+          labs(x = "Cell Type", y = "Enrichment Score",
+               title = paste0(input$celltype_method, " cell type enrichment on ", input$celltype_db, " database in ", input$species, " : ", clust)) +
+          theme_minimal() +
+          theme(plot.title = element_text(size = 12, face = "bold"),
+                axis.text.y = element_text(size = 10),
+                axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+                axis.title.x = element_text(size = 12),
+                axis.title.y = element_text(size = 12),
+                panel.background = element_blank(),
+                panel.grid.major = element_line(colour = "gray90")) +
+          scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 50))
       }
+      
+      output$fgsea_plots <- renderUI({
+        plotTabs <- lapply(names(barplots_celltype), function(clust) {
+          tabPanel(
+            title = clust,
+            plotOutput(outputId = paste0("fgsea_plot_", clust), height = "400px")
+          )
+        })
+        do.call(tabsetPanel, plotTabs)
+      })
+      
+      # Render data tables for each cluster as sub-tabs within the "Data Table" tab
+      output$fgsea_tables <- renderUI({
+        tableTabs <- lapply(names(enrichment_results), function(clust) {
+          tabPanel(
+            title = clust,
+            DT::dataTableOutput(outputId = paste0("fgsea_table_", clust))
+          )
+        })
+        do.call(tabsetPanel, tableTabs)
+      })
+      
+      # Render each plot and data table for each cluster
+      observe({
+        for (clust in names(barplots_celltype)) {
+          local({
+            cluster_name <- clust
+            
+            # Render the plot for the current cluster
+            output[[paste0("fgsea_plot_", cluster_name)]] <- renderPlot({
+              barplots_celltype[[cluster_name]]
+            })
+            
+            # Render the data table for the current cluster
+            output[[paste0("fgsea_table_", cluster_name)]] <- DT::renderDataTable({
+              enrichment_results[[cluster_name]]
+            })
+          })
+        }
+      })
     })
-    
-    
   })
+
   
   # Run pathway analysis
   observeEvent(input$run_pathway, {
