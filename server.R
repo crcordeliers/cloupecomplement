@@ -279,17 +279,22 @@ server <- function(input, output, session) {
         clust_ranks <- sort(clust_ranks[!duplicated(names(clust_ranks))], decreasing = TRUE)
         
         if(input$celltype_method == "FGSEA"){
-          enrichment_output <- as.data.frame(fgsea::fgsea(pathways = pathways, stats = clust_ranks))
+          enrichment_output <- fgsea::fgsea(pathways = pathways, stats = clust_ranks)
           enrichment_results[[as.character(clust)]] <- enrichment_output |>
-            dplyr::filter(NES >= 0)
+            as.data.frame() |>
+            dplyr::filter(NES >= 0) |>
+            dplyr::arrange(padj)
           
           barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
-                                                             aes(x = reorder(pathway, padj, decreasing = TRUE), y = NES, fill = padj))
+                                                             aes(x = pathway, y = NES, fill = padj))
         } else if(input$celltype_method == "Enrichr Web Query"){
           enrichment_output <- enrichR::enrichr(names(clust_ranks), databases = input$celltype_db)
-          enrichment_results[[as.character(clust)]] <- as.data.frame(enrichment_output[[1]])
+          enrichment_results[[as.character(clust)]] <- enrichment_output[[1]] |>
+            as.data.frame() |>
+            dplyr::arrange(Adjusted.P.value)
+            
           barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
-                                                             aes(x = reorder(Term, Adjusted.P.value, decreasing = TRUE), y = Combined.Score, fill = Adjusted.P.value))
+                                                             aes(x = Term, y = Combined.Score, fill = Adjusted.P.value))
         }
         
         barplots_celltype[[as.character(clust)]] <- barplots_celltype[[as.character(clust)]] +
