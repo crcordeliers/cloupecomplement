@@ -38,7 +38,7 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
     
     incProgress(0.4, detail = "Normalizing and scaling the data...")
     # Normalize and Scale the data
-    seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
+    seuratObj <- NormalizeData(seuratObj, normalization.method = "RC", scale.factor = 1e6)
     seuratObj <- ScaleData(seuratObj)
     
     incProgress(0.1, detail = "Loading appropriate mart...")
