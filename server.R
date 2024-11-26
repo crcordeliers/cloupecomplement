@@ -284,9 +284,8 @@ server <- function(input, output, session) {
             as.data.frame() |>
             dplyr::filter(NES >= 0) |>
             dplyr::arrange(padj)
-          
           barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
-                                                             aes(x = pathway, y = NES, fill = padj))
+                                                             aes(x = reorder(pathway, -padj), y = NES, fill = padj))
         } else if(input$celltype_method == "Enrichr Web Query"){
           enrichment_output <- enrichR::enrichr(names(clust_ranks), databases = input$celltype_db)
           enrichment_results[[as.character(clust)]] <- enrichment_output[[1]] |>
@@ -294,7 +293,7 @@ server <- function(input, output, session) {
             dplyr::arrange(Adjusted.P.value)
             
           barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
-                                                             aes(x = Term, y = Combined.Score, fill = Adjusted.P.value))
+                                                             aes(x = reorder(Term, -Adjusted.P.value), y = Combined.Score, fill = Adjusted.P.value))
         }
         
         barplots_celltype[[as.character(clust)]] <- barplots_celltype[[as.character(clust)]] +
