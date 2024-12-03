@@ -6,9 +6,11 @@ server <- function(input, output, session) {
   data_loaded <- reactiveValues(seuratObj = NULL, clusterMat = NULL)
   comparisons <- reactiveVal(list())
   diffexp_all <- reactiveVal(NULL)
-  diffexp_results <- reactiveVal(data.frame())
+  diffexp_results <- reactiveVal(NULL)
+  diffexp_status <- reactiveVal(NULL)
   pathway_result <- reactiveVal(NULL)
-  
+  timer <- reactiveTimer(1000)
+
   # Event to load data when the user clicks the load button
   observeEvent(input$load_data, {
     req(input$cellranger_out, input$cluster_csv, input$gene_expression_cutoff, input$spot_gene_cutoff, input$species)
@@ -43,7 +45,26 @@ server <- function(input, output, session) {
     })
     
     # Pre-calculate diffexp results while user is busy looking at something else
-    diffexp_all(FindAllMarkers(data_loaded$seuratObj))
+    process <- callr::r_bg(function(seuratObj){
+      library(Seurat)
+      FindAllMarkers(seuratObj)
+      }, 
+      args = list(data_loaded$seuratObj))
+    diffexp_status(process)
+  })
+  
+  # Timer to observe when the diffexp is done
+  observe({
+    timer()
+    process <- diffexp_status()
+    if(!is.null(process) && process$is_alive()){
+      print("alive")
+    } else if(!is.null(process) && process$is_alive() == FALSE){
+      diffexp_all(process$get_result())
+      diffexp_status(NULL)
+      print("DONE")
+      print(head(diffexp_all()))
+    }
   })
   
   output$data_info <- renderPrint({

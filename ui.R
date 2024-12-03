@@ -6,7 +6,7 @@ if (!require("enrichR")) install_github("wjawaid/enrichR")
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
                org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl, devtools,
-               enrichR)
+               enrichR, callr)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
