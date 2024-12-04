@@ -13,12 +13,15 @@ server <- function(input, output, session) {
 
   # Event to load data when the user clicks the load button
   observeEvent(input$load_data, {
-    req(input$cellranger_out, input$cluster_csv, input$gene_expression_cutoff, input$spot_gene_cutoff, input$species)
+    req(input$cellranger_out, input$cluster_csv, input$gene_expression_cutoff,
+        input$spot_gene_cutoff, input$species, input$normalisation_method)
     
     folderCellRangerOut <- input$cellranger_out
     filenameCluster <- input$cluster_csv$datapath
     
-    filter_results <- loadAndPreprocess(folderCellRangerOut, input$gene_expression_cutoff, input$spot_gene_cutoff, input$species)
+    filter_results <- loadAndPreprocess(folderCellRangerOut, input$gene_expression_cutoff,
+                                        input$spot_gene_cutoff, input$species,
+                                        input$normalisation_method)
     data_loaded$seuratObj <- filter_results$seuratObj
     data_loaded$mart <- filter_results$mart
     data_loaded$clusterMat <- loadClusterMat(filenameCluster, data_loaded$seuratObj)
@@ -45,11 +48,9 @@ server <- function(input, output, session) {
     })
     
     # Pre-calculate diffexp results while user is busy looking at something else
-    process <- callr::r_bg(function(seuratObj){
-      library(Seurat)
-      FindAllMarkers(seuratObj)
-      }, 
-      args = list(data_loaded$seuratObj))
+    process <- callr::r_bg(FindAllMarkers, 
+      args = list(data_loaded$seuratObj),
+      package = "Seurat")
     diffexp_status(process)
   })
   
@@ -62,8 +63,6 @@ server <- function(input, output, session) {
     } else if(!is.null(process) && process$is_alive() == FALSE){
       diffexp_all(process$get_result())
       diffexp_status(NULL)
-      print("DONE")
-      print(head(diffexp_all()))
     }
   })
   
@@ -175,7 +174,8 @@ server <- function(input, output, session) {
       object = data_loaded$seuratObj,
       features = input$gene_select_dotplot,
       group.by = "clusterMat"
-    ) + scale_fill_viridis(option = "plasma")
+    ) + 
+      scale_fill_viridis(option = "plasma")
   })
   
   output$dotPlot <- renderPlot({
@@ -184,8 +184,8 @@ server <- function(input, output, session) {
     DotPlot(
       object = data_loaded$seuratObj,
       features = input$gene_select_dotplot,
-      group.by = "clusterMat"
-    ) + 
+      group.by = "clusterMat", 
+    ) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
       scale_color_viridis_c(option = "plasma")
   })
