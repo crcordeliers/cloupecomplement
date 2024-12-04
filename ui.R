@@ -6,7 +6,7 @@ if (!require("enrichR")) install_github("wjawaid/enrichR")
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
                org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl, devtools,
-               enrichR, callr)
+               enrichR, callr, shinyjs)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -208,6 +208,7 @@ ui <- dashboardPage(
       
       # Diffexp tab
       tabItem(
+        useShinyjs(),
         tabName = "diffexp",
         h2("Differential Expression Analysis"),
         
@@ -223,6 +224,18 @@ ui <- dashboardPage(
             status = "info",
             
             selectInput("selected_cluster", "Select Cluster:", choices = NULL, selected = NULL)
+          )
+        ),
+        
+        # Status message
+        fluidRow(
+          
+          box(
+            id = "diffexp_message_box",
+            width = 12,
+            status = "warning",
+            solidHeader = TRUE,
+            textOutput("diffexp_message")
           )
         ),
         

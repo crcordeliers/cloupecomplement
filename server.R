@@ -8,6 +8,7 @@ server <- function(input, output, session) {
   diffexp_all <- reactiveVal(NULL)
   diffexp_results <- reactiveVal(NULL)
   diffexp_status <- reactiveVal(NULL)
+  diffexp_message <- reactiveVal("Waiting for input...")
   pathway_result <- reactiveVal(NULL)
   timer <- reactiveTimer(1000)
 
@@ -59,11 +60,14 @@ server <- function(input, output, session) {
     timer()
     process <- diffexp_status()
     if(!is.null(process) && process$is_alive()){
-      print("alive")
+      diffexp_message("Calculation of differential expression is running, this may take some time depending on hardware...")
     } else if(!is.null(process) && process$is_alive() == FALSE){
       diffexp_all(process$get_result())
       diffexp_status(NULL)
     }
+    output$diffexp_message <- renderText({
+      diffexp_message()
+    })
   })
   
   output$data_info <- renderPrint({
@@ -217,31 +221,44 @@ server <- function(input, output, session) {
     }
   )
   
+  observe_trigger <- reactive({
+    req(data_loaded$seuratObj)
+    list(
+      selected_cluster = input$selected_cluster,
+      diffexp = diffexp_all()
+    )
+  })
+  
   # diffexp
-  observeEvent(input$selected_cluster, {
-    req(data_loaded$seuratObj, input$selected_cluster, diffexp_all())
+  observe({
+    trigger_values <- observe_trigger()
+    selected_cluster <- trigger_values$selected_cluster
+    diffexp <- trigger_values$diffexp
     
     selected_cluster <- input$selected_cluster
-    
-    diffexp <- diffexp_all() |>
-      filter(str_detect(cluster, selected_cluster)) |>
-      dplyr::select(-contains("cluster"))
-    
-    if ("p_val" %in% colnames(diffexp)) {
-      diffexp$p_val <- format_pval(diffexp$p_val)
+
+    if(!is.null(diffexp_all())){
+      shinyjs::toggle("diffexp_message_box", anim = TRUE)
+      diffexp <- diffexp_all() |>
+        filter(str_detect(cluster, selected_cluster)) |>
+        dplyr::select(-contains("cluster"))
+      
+      if ("p_val" %in% colnames(diffexp)) {
+        diffexp$p_val <- format_pval(diffexp$p_val)
+      }
+      if ("p_val_adj" %in% colnames(diffexp)) {
+        diffexp$p_val_adj <- format_pval(diffexp$p_val_adj)
+      }
+      if ("avg_log2FC" %in% colnames(diffexp)) {
+        diffexp$avg_log2FC <- format_pval(diffexp$avg_log2FC)
+      }
+      
+      diffexp_results(diffexp)
+      
+      output$diffexp_table <- DT::renderDataTable({
+        DT::datatable(diffexp_results(), options = list(pageLength = 10, autoWidth = TRUE))
+      })
     }
-    if ("p_val_adj" %in% colnames(diffexp)) {
-      diffexp$p_val_adj <- format_pval(diffexp$p_val_adj)
-    }
-    if ("avg_log2FC" %in% colnames(diffexp)) {
-      diffexp$avg_log2FC <- format_pval(diffexp$avg_log2FC)
-    }
-    
-    diffexp_results(diffexp)
-    
-    output$diffexp_table <- DT::renderDataTable({
-      DT::datatable(diffexp_results(), options = list(pageLength = 10, autoWidth = TRUE))
-    })
   })
   
   output$download_diffexp <- downloadHandler(
