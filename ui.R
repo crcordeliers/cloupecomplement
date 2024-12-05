@@ -252,35 +252,49 @@ ui <- dashboardPage(
         )
       ),
       
-      # Cell Type Enrichment Analysis tab
       tabItem(
         tabName = "celltype_enrichment",
-        h2("Cell Type Enrichment Analysis"),
-        
-        downloadButton(outputId = "download_ct", label = "Download as PDF"),
-        br(), br(),
         
         fluidRow(
           box(
-            width = 12,
-            title = "Method selection",
-            solidHeader = TRUE,
+            title = "Cell Type Enrichment Settings", 
+            width = 12, 
+            solidHeader = TRUE, 
             status = "info",
+            
             selectInput("celltype_method", "Select Method:", choices = c("FGSEA", "Enrichr Web Query"), selected = "FGSEA"),
             selectInput("celltype_db", "Select Database:", choices = c("CellMarker_2024"), selected = "CellMarker_2024"),
-            actionButton("run_ct_enrichment", "Run Celltype Enrichment")
+            actionButton("run_ct_enrichment", "Run Cell Type Enrichment", class = "btn-primary")
           )
         ),
         
         fluidRow(
           box(
-            width = 12,
-            title = "Cluster-specific Cell Type Enrichment",
-            solidHeader = TRUE,
+            title = "Cell Type Enrichment Results", 
+            width = 12, 
+            solidHeader = TRUE, 
             status = "primary",
+            
             tabsetPanel(
-              tabPanel("Plot", uiOutput("fgsea_plots")),
-              tabPanel("Data Table", uiOutput("fgsea_tables"))
+              id = "ct_results_tabs",
+              
+              tabPanel(
+                title = "Plot", 
+                value = "plot",
+                br(),
+                downloadButton("download_ct_plot_pdf", "Download Cell Type Plot as PDF"),
+                br(), br(),
+                uiOutput("fgsea_plots")
+              ),
+              
+              tabPanel(
+                title = "Data Table", 
+                value = "table",
+                br(),
+                downloadButton("download_ct_data_csv", "Download Cell Type Data Table as CSV"),
+                br(), br(),
+                uiOutput("fgsea_tables")
+              )
             )
           )
         )
@@ -332,6 +346,7 @@ ui <- dashboardPage(
                     tabPanel(
                       title = "Data Table", 
                       value = "table",
+                      br(),
                       downloadButton("download_pathway_data_csv", "Download Pathway Data Table as CSV"),
                       br(),br(),
                       DT::dataTableOutput("enrichment_results")

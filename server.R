@@ -265,7 +265,7 @@ server <- function(input, output, session) {
   
   output$download_diffexp <- downloadHandler(
     filename = function() {
-      paste("DiffExp_Cluster", input$selected_cluster, "_vs_all_others.csv", sep = "")
+      paste0("DiffExp_Cluster", input$selected_cluster, "_vs_all_others.csv")
     },
     content = function(file) {
       write.csv(diffexp_results(), file)
@@ -357,21 +357,20 @@ server <- function(input, output, session) {
         plotTabs <- lapply(names(barplots_celltype), function(clust) {
           tabPanel(
             title = clust,
-            plotOutput(outputId = paste0("fgsea_plot_", clust), height = "400px")
+            plotOutput(outputId = paste0(input$celltype_method, "_plot_", clust), height = "400px")
           )
         })
-        do.call(tabsetPanel, plotTabs)
+        do.call(tabsetPanel, c(id = "plot_tabs", plotTabs))
       })
       
-      # Render data tables for each cluster as sub-tabs within the "Data Table" tab
       output$fgsea_tables <- renderUI({
         tableTabs <- lapply(names(enrichment_results), function(clust) {
           tabPanel(
             title = clust,
-            DT::dataTableOutput(outputId = paste0("fgsea_table_", clust))
+            DT::dataTableOutput(outputId = paste0(input$celltype_method, "_table_", clust))
           )
         })
-        do.call(tabsetPanel, tableTabs)
+        do.call(tabsetPanel, c(id = "table_tabs", tableTabs))
       })
       
       # Render each plot and data table for each cluster
@@ -381,20 +380,44 @@ server <- function(input, output, session) {
             cluster_name <- clust
             
             # Render the plot for the current cluster
-            output[[paste0("fgsea_plot_", cluster_name)]] <- renderPlot({
+            output[[paste0(input$celltype_method, "_plot_", cluster_name)]] <- renderPlot({
               barplots_celltype[[cluster_name]]
             })
             
             # Render the data table for the current cluster
-            output[[paste0("fgsea_table_", cluster_name)]] <- DT::renderDataTable({
+            output[[paste0(input$celltype_method, "_table_", cluster_name)]] <- DT::renderDataTable({
               enrichment_results[[cluster_name]]
             })
           })
         }
       })
+      output$download_ct_plot_pdf <- downloadHandler(
+        filename = function() {
+          paste0(Sys.Date(), "_", input$plot_tabs, "_Cell_Type_Enrichment_Plot.pdf")
+        },
+        content = function(file) {
+          selected_cluster <- input$plot_tabs
+          selected_plot <- barplots_celltype[[selected_cluster]]
+          pdf(file, width = 12, height = 6)
+          print(selected_plot)
+          dev.off()
+        }
+      )
+      output$download_ct_data_csv <- downloadHandler(
+        filename = function() {
+          paste0(Sys.Date(), "_", input$table_tabs, "_Cell_Type_Enrichment_table.csv")
+        },
+        content = function(file) {
+          selected_cluster <- input$table_tabs
+          selected_table <- enrichment_results[[selected_cluster]]
+          selected_table <- dplyr::mutate(selected_table, across(where(is.list), ~sapply(.x, paste, collapse = ", ")))
+          write.csv(selected_table, file, row.names = FALSE)
+        }
+      )
     })
   })
-
+  
+  
   
   # Run pathway analysis
   observeEvent(input$run_pathway, {
