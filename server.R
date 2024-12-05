@@ -64,6 +64,7 @@ server <- function(input, output, session) {
     } else if(!is.null(process) && process$is_alive() == FALSE){
       diffexp_all(process$get_result())
       diffexp_status(NULL)
+      shinyjs::toggle("diffexp_message_box", anim = TRUE)
     }
     output$diffexp_message <- renderText({
       diffexp_message()
@@ -157,12 +158,12 @@ server <- function(input, output, session) {
   # Download PDF plot (violin + beeswarm)
   output$download_pdf <- downloadHandler(
     filename = function() {
-      paste("plot_", Sys.Date(), ".pdf", sep = "")
+      paste0(Sys.Date(), "_violin_plot_", input$gene_select, ".pdf")
     },
     content = function(file) {
       gene_data <- prepare_gene_data(input$gene_select, data_loaded)
       
-      pdf(file, width = 8, height = 12)
+      pdf(file, width = 8, height = 8)
       par(mfrow = c(2, 1))
       plot(create_plot_with_stats(create_violin_plot, gene_data, input$gene_select, comparisons(), input$display_pval))
       plot(create_plot_with_stats(create_beeswarm_plot, gene_data, input$gene_select, comparisons(), input$display_pval))
@@ -196,26 +197,28 @@ server <- function(input, output, session) {
   
   output$download_combined_pdf <- downloadHandler(
     filename = function() {
-      paste("heatmap_dotplot_", Sys.Date(), ".pdf", sep = "")
+      first_genes <- input$gene_select_dotplot[!is.na(input$gene_select_dotplot[1:3])][1:3]
+      paste0(Sys.Date(), "_heatmap_dotplot_", paste(first_genes, collapse = "_"), ".pdf", Sys.Date(), ".pdf", sep = "")
     },
     content = function(file) {
       pdf(file, width = 8, height = 12)
-      
-      DoHeatmap(
+      par(mfrow = c(2, 1))
+      heatmap <- DoHeatmap(
         object = data_loaded$seuratObj,
         features = input$gene_select_dotplot,
         group.by = "clusterMat"
       ) + scale_fill_viridis(option = "plasma")
       
-      dev.flush()
-      
-      DotPlot(
+      dotplot <- DotPlot(
         object = data_loaded$seuratObj,
         features = input$gene_select_dotplot,
         group.by = "clusterMat"
       ) +
         theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
         scale_color_viridis_c(option = "plasma")
+      
+      print(heatmap)
+      print(dotplot)
       
       dev.off()
     }
@@ -238,7 +241,6 @@ server <- function(input, output, session) {
     selected_cluster <- input$selected_cluster
 
     if(!is.null(diffexp_all())){
-      shinyjs::toggle("diffexp_message_box", anim = TRUE)
       diffexp <- diffexp_all() |>
         filter(str_detect(cluster, selected_cluster)) |>
         dplyr::select(-contains("cluster"))

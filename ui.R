@@ -170,7 +170,7 @@ ui <- dashboardPage(
       tabItem(tabName = "hmap_dotplot",
               h2("Heatmap & Dotplots"),
               
-              downloadButton("download_combined_pdf", "Download Heatmap & DotPlot as PDF"),
+              downloadButton("download_combined_pdf", "Download as PDF"),
               br(), br(),
               
               # gene selection
@@ -257,10 +257,8 @@ ui <- dashboardPage(
         tabName = "celltype_enrichment",
         h2("Cell Type Enrichment Analysis"),
         
-        fluidRow(
-          column(6, downloadButton("download_enrichment_pdf", "Download Enrichment as PDF"))
-        ),
-        br(),
+        downloadButton(outputId = "download_ct", label = "Download as PDF"),
+        br(), br(),
         
         fluidRow(
           box(
@@ -299,11 +297,11 @@ ui <- dashboardPage(
                   status = "info",
                   
                   # custom diffexp checkbox & file input
-                  checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
-                  conditionalPanel(
-                    condition = "input.use_custom_diffexp == true",
-                    fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
-                  ),
+                  # checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
+                  # conditionalPanel(
+                  #   condition = "input.use_custom_diffexp == true",
+                  #   fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
+                  # ),
                   
                   selectInput("pathway_method", "Select Method:", choices = c("ORA", "FGSEA"),
                               selected = "ORA"),

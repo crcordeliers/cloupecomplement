@@ -90,7 +90,7 @@ create_violin_plot <- function(gene_data, gene) {
     geom_violin(aes(fill = factor(Cluster)), trim = TRUE) +
     geom_boxplot(width = 0.05, outlier.shape = NA, fill = "gray") +
     theme_minimal() +
-    labs(title = paste("Violin Plot for", gene), x = "Cluster", y = "Expression Level")
+    labs(title = paste("Violin Plot for", gene), x = NULL, y = "Expression Level", fill = "Cluster")
 }
 
 create_beeswarm_plot <- function(gene_data, gene) {
@@ -99,7 +99,7 @@ create_beeswarm_plot <- function(gene_data, gene) {
     geom_boxplot(width = 0.05, outlier.shape = NA, fill = "gray") +
     guides(color = guide_legend(override.aes = list(size = 4))) +
     theme_minimal() +
-    labs(title = paste("Beeswarm Plot for", gene), x = "Cluster", y = "Expression Level")
+    labs(title = paste("Beeswarm Plot for", gene), x = NULL, y = "Expression Level", color = "Cluster")
 }
 
 create_plot_with_stats <- function(plot_func, gene_data, gene, comparisons, display_pval) {
