@@ -174,8 +174,7 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
   if (method == "ORA") {
     gene_list <- genes |>
       filter(p_val_adj <= 0.05)
-    print(gene_list)
-    
+
     # Enrichment based on the selected database
     result <- switch(database,
                      GO = enrichGO(gene = gene_list$ensembl_gene_id,

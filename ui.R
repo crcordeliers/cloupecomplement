@@ -311,11 +311,11 @@ ui <- dashboardPage(
                   status = "info",
                   
                   # custom diffexp checkbox & file input
-                  # checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
-                  # conditionalPanel(
-                  #   condition = "input.use_custom_diffexp == true",
-                  #   fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
-                  # ),
+                  checkboxInput("use_custom_diffexp", "Use Custom Differential Expression Results", value = FALSE),
+                  conditionalPanel(
+                    condition = "input.use_custom_diffexp == true",
+                    fileInput("diffexp_file", "Upload Differential Expression CSV", accept = ".csv")
+                  ),
                   
                   selectInput("pathway_method", "Select Method:", choices = c("ORA", "FGSEA"),
                               selected = "ORA"),
@@ -349,7 +349,7 @@ ui <- dashboardPage(
                       br(),
                       downloadButton("download_pathway_data_csv", "Download Pathway Data Table as CSV"),
                       br(),br(),
-                      DT::dataTableOutput("enrichment_results")
+                      DT::dataTableOutput("pathway_results")
                     )
                   )
                 )

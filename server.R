@@ -10,6 +10,7 @@ server <- function(input, output, session) {
   diffexp_status <- reactiveVal(NULL)
   diffexp_message <- reactiveVal("Waiting for input...")
   pathway_result <- reactiveVal(NULL)
+  dotplot_pathway <- reactiveVal(NULL)
   timer <- reactiveTimer(1000)
 
   # Event to load data when the user clicks the load button
@@ -442,19 +443,20 @@ server <- function(input, output, session) {
       })
       
       incProgress(0.1, detail = "Rendering plots")
+      dotplot_pathway(dotplot(result, showCategory = 30) +
+                        ggtitle(paste0(method, " method on ", database, " database in ", species, " : ", chosenCluster, " vs all")) +
+                        theme(
+                          plot.title = element_text(size = 12, face = "bold"),
+                          axis.text.y = element_text(size = 10),
+                          axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+                          axis.title.x = element_text(size = 12),
+                          axis.title.y = element_text(size = 12),
+                          panel.background = element_blank(),
+                          panel.grid.major = element_line(colour = "gray90")
+                        ) +
+                        scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 50)))
       output$pathway_plot <- renderPlot({
-        dotplot(result, showCategory = 30) +
-          ggtitle(paste0(method, " method on ", database, " database in ", species, " : ", chosenCluster, " vs all")) +
-          theme(
-            plot.title = element_text(size = 12, face = "bold"),
-            axis.text.y = element_text(size = 10),
-            axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
-            axis.title.x = element_text(size = 12),
-            axis.title.y = element_text(size = 12),
-            panel.background = element_blank(),
-            panel.grid.major = element_line(colour = "gray90")
-          ) +
-          scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 50))
+        dotplot_pathway()
       })
     })
   })
@@ -467,21 +469,7 @@ server <- function(input, output, session) {
     content = function(file) {
       pdf(file, width = 6, height = 9)
       
-      result <- pathway_result()
-      
-      if (!is.null(result)) {
-        if (input$pathway_method == "Gene Ontology") {
-          p <- dotplot(result, showCategory = 20)
-        } else if (input$pathway_method == "FGSEA") {
-          p <- ggplot(result, aes(x = reorder(pathway, NES), y = NES)) +
-            geom_bar(stat = "identity") +
-            coord_flip()
-        } else {
-          plot(1, 1, main = "Error: Result not compatible with plot")
-        }
-      } else {
-        plot(1, 1, main = "Error: Result is NULL")
-      }
+      print(dotplot_pathway())
       
       dev.off()
     }
