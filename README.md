@@ -61,18 +61,13 @@ The app use these dependencies, but those should be automatically downloaded whe
    - View and download the results in table format.
 
 4. **Pathway Analysis:**
-   - Choose a pathway analysis method and run enrichment analysis based on the differential expression results.
-   - Customize the visualization (e.g., display a limited number of enriched categories).
-
+   - Choose a pathway analysis method and run enrichment analysis based on the differential expression results. The pathway analysis will be done on the cluster selected in the Differential Expression tab.
+  - View and download the results in table and pdf format.
 ## Roadmap
 
 ### Planned Features:
-- <s>**Support for Other Species:** Add the ability to analyze datasets from species other than human and mouse.</s> DONE !
-- **Better handling of error** Try to limit the crashing of the app when unexpected input is given (or fatal error).
-- <s>**Add a folder select** as for the fileinput so that it limits the selection of non-existant folder path.</s> Too complex, or too ugly (looking at you shinyFiles) to be implemented seamlessly.
-- <s>**FGSEA Integration:** Implement the FGSEA (Fast Gene Set Enrichment Analysis) method as an alternative pathway analysis option.<s> DONE !
-- <s>**Optimize Pathway Analysis:** Preload the gene annotation (using biomaRt) at the start to avoid reloading it with each new analysis, improving efficiency.<s> DONE !
 - **Customizable Pathway Visualization:** Add an option to control the number of categories shown in the pathway analysis plots, with automatic height scaling to accommodate the chosen number.
+- **Method Documentation:** Add a way to give the user the mat & med section of the analysis based on their selection in the app's choices.
 
 ## Contributions
 
