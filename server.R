@@ -1,6 +1,7 @@
 server <- function(input, output, session) {
   
   source("functions.R")
+  disable("use_custom_diffexp")
   
   # Reactive values for loaded data and comparisons
   data_loaded <- reactiveValues(seuratObj = NULL, clusterMat = NULL)
@@ -245,6 +246,12 @@ server <- function(input, output, session) {
       diffexp <- diffexp_all() |>
         filter(str_detect(cluster, selected_cluster)) |>
         dplyr::select(-contains("cluster"))
+      
+      if ("gene" %in% colnames(diffexp)) {
+        rownames(diffexp) <- diffexp$gene
+      } else {
+        warning("The 'gene' column is missing in the differential expression results.")
+      }
       
       if ("p_val" %in% colnames(diffexp)) {
         diffexp$p_val <- format_pval(diffexp$p_val)
