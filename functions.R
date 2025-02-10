@@ -20,7 +20,8 @@ checkMart <- function(species, updateMart = FALSE){
 loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_gene_cutoff, species, normalisation_method){
   withProgress(message = "Loading data...", value = 0, {
     incProgress(0.1, detail = "Preparing data...")
-    seuratObj <- Load10X_Spatial(folderCellRangerOut)
+    data <- Read10X(file.path(folderCellRangerOut, "/filtered_feature_bc_matrix"))
+    seuratObj <- CreateSeuratObject(counts = data)
 
     incProgress(0.1, detail = "Filtering genes...")
     # Filter genes based on minimum expression in % of cells
@@ -42,8 +43,8 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
       seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
       seuratObj <- ScaleData(seuratObj)
     }else if(normalisation_method == "SCTransform"){
-      DefaultAssay(seuratObj) <- "Spatial"
-      seuratObj <- SCTransform(seuratObj, assay = "Spatial")
+      DefaultAssay(seuratObj) <- Assays(data_loaded$seuratObj)
+      seuratObj <- SCTransform(seuratObj, assay = Assays(data_loaded$seuratObj))
     }
     
     incProgress(0.1, detail = "Loading appropriate mart...")
