@@ -1,9 +1,9 @@
 
-# Shiny App for Single-Cell RNA-Seq Data Exploration
+# Shiny App for Spatial Transcriptomic Data Exploration
 
 ## Overview
 
-This Shiny app is designed to complement 10x Genomics Loupe Browser for single-cell RNA-seq data analysis. It provides an intuitive interface for researchers to perform additional data preprocessing, visualization, and downstream analyses, such as differential expression and pathway analysis, after manual clustering in Loupe Browser.
+This Shiny app is designed to complement 10x Genomics Loupe Browser for spatial transcriptomic data analysis. It provides an intuitive interface for researchers to perform additional data preprocessing, visualization, and downstream analyses, such as differential expression and pathway analysis, after manual clustering in Loupe Browser.
 
 ### Key Features:
 

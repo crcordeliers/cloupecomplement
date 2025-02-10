@@ -31,7 +31,7 @@ server <- function(input, output, session) {
     
     Idents(data_loaded$seuratObj) <- data_loaded$seuratObj[[]]["clusterMat"][[1]]
     
-    gene_expression_sums <- Matrix::rowSums(data_loaded$seuratObj[["Spatial"]]$counts)
+    gene_expression_sums <- Matrix::rowSums(data_loaded$seuratObj[[Assays(data_loaded$seuratObj)]]$counts)
     ordered_genes <- names(sort(gene_expression_sums, decreasing = TRUE))
     
     sorted_clusters <- sort(unique(data_loaded$clusterMat[,1]))
