@@ -1,16 +1,16 @@
 checkMart <- function(species, updateMart = FALSE){
-  if(species == "Human"){
+  if (species == "Human") {
     speciesDataset <- "hsapiens_gene_ensembl"
     martFile <- "./data/humanMart.rds"
   }
-  else if(species == "Mouse"){
+  else if (species == "Mouse") {
     speciesDataset <- "mmusculus_gene_ensembl"
     martFile <- "./data/mouseMart.rds"
   }
   if (file.exists(martFile) & updateMart == FALSE) {
     mart <- readRDS(martFile)
   } 
-  else if (!file.exists(martFile) | updateMart == TRUE){
+  else if (!file.exists(martFile) | updateMart == TRUE) {
     mart <- useMart("ensembl", dataset = speciesDataset)
     saveRDS(mart, martFile)
   }
@@ -39,10 +39,10 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
     
     incProgress(0.4, detail = "Normalizing and scaling the data...")
     # Normalize and Scale the data
-    if(normalisation_method == "LogNormalize"){
+    if (normalisation_method == "LogNormalize") {
       seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
       seuratObj <- ScaleData(seuratObj)
-    }else if(normalisation_method == "SCTransform"){
+    } else if (normalisation_method == "SCTransform") {
       DefaultAssay(seuratObj) <- Assays(data_loaded$seuratObj)
       seuratObj <- SCTransform(seuratObj, assay = Assays(data_loaded$seuratObj))
     }
@@ -165,7 +165,7 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
   
   # Set species database for GO terms
   go_species <- ifelse(species == "Human", "org.Hs.eg.db", "org.Mm.eg.db")
-  if(database == "HALLMARK"){
+  if (database == "HALLMARK") {
     hallmark_gene_sets <- msigdbr(species = tolower(species), category = "H")
     hallmark_gene_list <- hallmark_gene_sets |>
       dplyr::select(gs_name, entrez_gene)

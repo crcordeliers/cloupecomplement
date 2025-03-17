@@ -65,9 +65,9 @@ server <- function(input, output, session) {
   observe({
     timer()
     process <- diffexp_status()
-    if(!is.null(process) && process$is_alive()){
+    if (!is.null(process) && process$is_alive()) {
       diffexp_message("Calculation of differential expression is running, this may take some time depending on hardware...")
-    } else if(!is.null(process) && process$is_alive() == FALSE){
+    } else if (!is.null(process) && process$is_alive() == FALSE) {
       diffexp_all(process$get_result())
       diffexp_status(NULL)
       shinyjs::toggle("diffexp_message_box", anim = TRUE)
@@ -178,27 +178,57 @@ server <- function(input, output, session) {
   )
   
   # Heatmap & Dotplot
-  output$heatmapPlot <- renderPlot({
+  heatmap_data <- eventReactive(input$run_heatmap, {
     req(input$gene_select_dotplot, data_loaded$seuratObj)
     
-    DoHeatmap(
-      object = data_loaded$seuratObj,
-      features = input$gene_select_dotplot,
-      group.by = "clusterMat"
-    ) + 
-      scale_fill_viridis(option = "plasma")
+    gexp <- GetAssayData(data_loaded$seuratObj, slot = "scale.data")
+    
+    sample_annot <- data_loaded$seuratObj[[]] %>% rownames_to_column("sample")
+    genes <- input$gene_select_dotplot
+    
+    dataHm <- gexp %>%
+      t() %>%
+      as.data.frame() %>%
+      rownames_to_column("sample") %>%
+      left_join(sample_annot, by = "sample") %>%
+      tibble() %>%
+      group_by(clusterMat)
+    
+  color_limit = max(quantile(as.matrix((dataHm[,genes])),0.99), -quantile(as.matrix((dataHm[,genes])), 0.01))
+    
+    ggheatmap(dataHm,
+              colv = "sample",
+              rowv = genes,
+              hm_colors = "RdBu",
+              scale = TRUE,
+              center = TRUE, 
+              hm_color_limits = c(-color_limit,color_limit),
+              show_dend_col = FALSE,
+              show_dend_row = FALSE,
+              show_colnames = FALSE,
+              show_rownames = TRUE,
+              colors_title = "Scaled expression (log2 UQ)") +
+      plot_layout(guides = 'collect')
   })
   
-  output$dotPlot <- renderPlot({
+  dotplot_data <- eventReactive(input$run_heatmap, {
     req(input$gene_select_dotplot, data_loaded$seuratObj)
     
     DotPlot(
       object = data_loaded$seuratObj,
       features = input$gene_select_dotplot,
-      group.by = "clusterMat", 
+      group.by = "clusterMat"
     ) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
       scale_color_viridis_c(option = "plasma")
+  })
+  
+  output$heatmapPlot <- renderPlot({
+    heatmap_data()
+  })
+  
+  output$dotPlot <- renderPlot({
+    dotplot_data()
   })
   
   output$download_combined_pdf <- downloadHandler(
@@ -246,7 +276,7 @@ server <- function(input, output, session) {
     
     selected_cluster <- input$selected_cluster
 
-    if(!is.null(diffexp_all())){
+    if (!is.null(diffexp_all())) {
       diffexp <- diffexp_all() |>
         filter(str_detect(cluster, selected_cluster)) |>
         dplyr::select(-contains("cluster"))
@@ -330,7 +360,7 @@ server <- function(input, output, session) {
         clust_ranks <- setNames(as.numeric(cluster_genes$avg_log2FC), rownames(cluster_genes))
         clust_ranks <- sort(clust_ranks[!duplicated(names(clust_ranks))], decreasing = TRUE)
         
-        if(input$celltype_method == "FGSEA"){
+        if (input$celltype_method == "FGSEA") {
           enrichment_output <- fgsea::fgsea(pathways = pathways, stats = clust_ranks)
           enrichment_results[[as.character(clust)]] <- enrichment_output |>
             as.data.frame() |>
@@ -338,7 +368,7 @@ server <- function(input, output, session) {
             dplyr::arrange(padj)
           barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
                                                              aes(x = reorder(pathway, -padj), y = NES, fill = padj))
-        } else if(input$celltype_method == "Enrichr Web Query"){
+        } else if (input$celltype_method == "Enrichr Web Query") {
           enrichment_output <- enrichR::enrichr(names(clust_ranks), databases = input$celltype_db)
           enrichment_results[[as.character(clust)]] <- enrichment_output[[1]] |>
             as.data.frame() |>
@@ -428,8 +458,6 @@ server <- function(input, output, session) {
       )
     })
   })
-  
-  
   
   # Run pathway analysis
   observeEvent(input$run_pathway, {
