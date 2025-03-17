@@ -2,6 +2,7 @@ if (!require("BiocManager")) install.packages("BiocManager", quiet = TRUE)
 if (!require("devtools")) install.packages("devtools", quiet = TRUE)
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
 if (!require("enrichR")) install_github("wjawaid/enrichR")
+if (!require("presto")) install_github("immunogenomics/presto")
 
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
@@ -186,6 +187,21 @@ ui <- dashboardPage(
                 )
               ),
               
+              tags$script(HTML("
+      Shiny.addCustomMessageHandler('enhanceSelectize', function(inputId) {
+        var selectize = $('#' + inputId).selectize()[0].selectize;
+        
+        if (selectize) {
+          selectize.onPaste = function(e) {
+            var pastedData = (e.originalEvent || e).clipboardData.getData('text');
+            var genes = pastedData.split(/[\\s,]+/).filter(Boolean);
+            selectize.addItems(genes);
+            e.preventDefault();
+          };
+        }
+      });
+    ")),
+              
               # plots
               fluidRow(
                 box(
@@ -340,7 +356,7 @@ ui <- dashboardPage(
                       br(),
                       downloadButton("download_pathway_plot_pdf", "Download Pathway Plot as PDF"),
                       br(),br(),
-                      plotOutput("pathway_plot", height="700px")
+                      plotOutput("pathway_plot", height = "700px")
                     ),
                     
                     tabPanel(

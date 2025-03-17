@@ -42,6 +42,10 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
     updateSelectizeInput(session, "selected_cluster", choices = sorted_clusters, selected = sorted_clusters[1])
     
+    observe({
+      session$sendCustomMessage("enhanceSelectize", "gene_select_dotplot")
+    })
+    
     # Update the filtered out information
     output$data_info <- renderPrint({
       cat("Seurat Object Dimensions:", dim(data_loaded$seuratObj), "\n")
@@ -102,7 +106,7 @@ server <- function(input, output, session) {
       incProgress(0.4, detail = "Querying gene table...")
       mart <- checkMart(input$species)
 
-      if(!is.null(mart)) {
+      if (!is.null(mart)) {
         requestGeneTable(mart, input$species)
       } else {
         showNotification("Failed to load the mart", type = "error")
