@@ -252,7 +252,7 @@ server <- function(input, output, session) {
   output$download_combined_pdf <- downloadHandler(
     filename = function() {
       first_genes <- input$gene_select_dotplot[!is.na(input$gene_select_dotplot[1:3])][1:3]
-      paste0(Sys.Date(), "_heatmap_dotplot_", paste(first_genes, collapse = "_"), ".pdf", Sys.Date(), ".pdf", sep = "")
+      paste0(Sys.Date(), "_heatmap_dotplot_", paste(first_genes, collapse = "_"), ".pdf")
     },
     content = function(file) {
       pdf(file, width = 8, height = 12)
