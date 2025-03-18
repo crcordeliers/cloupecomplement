@@ -295,7 +295,7 @@ server <- function(input, output, session) {
     diffexp <- trigger_values$diffexp
     
     selected_cluster <- input$selected_cluster
-
+    
     if (!is.null(diffexp_all())) {
       diffexp <- diffexp_all() |>
         filter(str_detect(cluster, selected_cluster)) |>
@@ -320,7 +320,11 @@ server <- function(input, output, session) {
       diffexp_results(diffexp)
       
       output$diffexp_table <- DT::renderDataTable({
-        DT::datatable(diffexp_results(), options = list(pageLength = 10, autoWidth = TRUE))
+        diffexp_display <- diffexp_results() |> 
+          dplyr::select(-gene) |> 
+          dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
+        
+        DT::datatable(diffexp_display, options = list(pageLength = 10, autoWidth = TRUE))
       })
     }
   })
@@ -330,7 +334,11 @@ server <- function(input, output, session) {
       paste0("DiffExp_Cluster", input$selected_cluster, "_vs_all_others.csv")
     },
     content = function(file) {
-      write.csv(diffexp_results(), file)
+      diffexp_export <- diffexp_results() |> 
+        dplyr::select(-gene) |> 
+        dplyr::rename(`% Expressed in Cluster` = pct.1, `% Expressed in Others` = pct.2)
+      
+      write.csv(diffexp_export, file, row.names = TRUE)
     }
   )
   
