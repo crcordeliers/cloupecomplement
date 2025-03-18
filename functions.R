@@ -69,6 +69,9 @@ loadClusterMat <- function(filenameCluster, seuratObj) {
   valid_indices <- !is.na(matched_indices)
   clusterMat <- clusterMat[matched_indices[valid_indices], , drop = FALSE]
   
+  # Order by cluster number to avoid lexicographic order
+  clusterMat[,1] <- factor(clusterMat[,1], levels = mixedsort(unique(clusterMat[,1])))
+  
   return(clusterMat)
 }
 
@@ -83,9 +86,6 @@ prepare_gene_data <- function(gene, data_loaded) {
     Barcode = colnames(countMatrix),
     Cluster = data_loaded$clusterMat[barcodes,1]
   )
-  
-  gene_data$Cluster <- factor(gene_data$Cluster, 
-                              levels = mixedsort(unique(gene_data$Cluster)))
   
   return(gene_data)
 }

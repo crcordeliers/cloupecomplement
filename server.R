@@ -184,42 +184,44 @@ server <- function(input, output, session) {
     withProgress(message = "Generating Heatmap...", value = 0, {
       
       incProgress(0.2, detail = "Extracting data")
-      gexp <- GetAssayData(data_loaded$seuratObj, slot = "scale.data")
+      
+      genes <- input$gene_select_dotplot
+      gexp <- GetAssayData(data_loaded$seuratObj, slot = "scale.data")[genes, , drop = FALSE]
       
       sample_annot <- data_loaded$seuratObj[[]] %>% rownames_to_column("sample")
-      genes <- input$gene_select_dotplot
       
       incProgress(0.3, detail = "Processing data")
-      dataHm <- gexp %>%
-        t() %>%
-        as.data.frame() %>%
+      
+      dataHm <- as.data.frame(t(gexp)) %>%
         rownames_to_column("sample") %>%
         left_join(sample_annot, by = "sample") %>%
         tibble() %>%
         group_by(clusterMat)
       
-      color_limit = max(quantile(as.matrix((dataHm[, genes])), 0.99), 
-                        -quantile(as.matrix((dataHm[, genes])), 0.01))
+      color_limit <- max(quantile(dataHm[, genes, drop = FALSE], 0.99, na.rm = TRUE),
+                         -quantile(dataHm[, genes, drop = FALSE], 0.01, na.rm = TRUE))
       
       incProgress(0.2, detail = "Generating heatmap")
+      
       hmplot <- ggheatmap(dataHm,
-                colv = "sample",
-                rowv = genes,
-                hm_colors = "RdBu",
-                scale = TRUE,
-                center = TRUE, 
-                hm_color_limits = c(-color_limit, color_limit),
-                show_dend_col = FALSE,
-                show_dend_row = FALSE,
-                show_colnames = FALSE,
-                show_rownames = TRUE,
-                colors_title = "Scaled expression (log2 UQ)") +
+                          colv = "sample",
+                          rowv = genes,
+                          hm_colors = "RdBu",
+                          scale = TRUE,
+                          center = TRUE, 
+                          hm_color_limits = c(-color_limit, color_limit),
+                          show_dend_col = FALSE,
+                          show_dend_row = FALSE,
+                          show_colnames = FALSE,
+                          show_rownames = TRUE,
+                          colors_title = "Scaled expression (log2 UQ)") +
         plot_layout(guides = 'collect')
       
       incProgress(0.3, detail = "Done")
       hmplot
     })
   })
+  
   
   dotplot_data <- eventReactive(input$run_heatmap, {
     req(input$gene_select_dotplot, data_loaded$seuratObj)
