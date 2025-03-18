@@ -218,8 +218,6 @@ ui <- dashboardPage(
                     tabPanel(
                       title = "Heatmap", 
                       value = "heatmap",
-                      br(),
-                      downloadButton("download_heatmap_pdf", "Download Heatmap as PDF"),
                       br(), br(),
                       plotOutput("heatmapPlot", height = "700px")
                     ),
@@ -227,8 +225,6 @@ ui <- dashboardPage(
                     tabPanel(
                       title = "Dotplot", 
                       value = "dotplot",
-                      br(),
-                      downloadButton("download_dotplot_pdf", "Download Dotplot as PDF"),
                       br(), br(),
                       plotOutput("dotPlot", height = "700px")
                     )
