@@ -8,7 +8,7 @@ if (!require("ggheatmapper")) install_github("csgroen/ggheatmapper")
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, ggheatmapper, viridis, clusterProfiler,
                org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl, devtools,
-               enrichR, callr, shinyjs)
+               enrichR, callr, shinyjs, gtools)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 

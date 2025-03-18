@@ -76,11 +76,16 @@ loadClusterMat <- function(filenameCluster, seuratObj) {
 prepare_gene_data <- function(gene, data_loaded) {
   countMatrix <- GetAssayData(data_loaded$seuratObj, layer = "data")
   
+  barcodes <- colnames(countMatrix)
+  
   gene_data <- data.frame(
     Expression = countMatrix[gene, ], 
     Barcode = colnames(countMatrix),
-    Cluster = data_loaded$clusterMat[,1]
+    Cluster = data_loaded$clusterMat[barcodes,1]
   )
+  
+  gene_data$Cluster <- factor(gene_data$Cluster, 
+                              levels = mixedsort(unique(gene_data$Cluster)))
   
   return(gene_data)
 }

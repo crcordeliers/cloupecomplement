@@ -91,7 +91,7 @@ server <- function(input, output, session) {
     req(input$species)
     withProgress(message = "Updating mart...", value = 0, {
       incProgress(0.4, detail = "Loading mart...")
-
+      
       checkMart(input$species, updateMart = TRUE)
       incProgress(0.4, detail = "Saving mart...")
       Sys.sleep(1)
@@ -105,7 +105,7 @@ server <- function(input, output, session) {
     withProgress(message = "Updating gene table...", value = 0, {
       incProgress(0.4, detail = "Querying gene table...")
       mart <- checkMart(input$species)
-
+      
       if (!is.null(mart)) {
         requestGeneTable(mart, input$species)
       } else {
