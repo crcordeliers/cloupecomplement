@@ -8,7 +8,7 @@ if (!require("ggheatmapper")) install_github("csgroen/ggheatmapper")
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, ggheatmapper, viridis, clusterProfiler,
                org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl, devtools,
-               enrichR, callr, shinyjs, gtools)
+               enrichR, callr, shinyjs, gtools, WriteXLS)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -240,7 +240,7 @@ ui <- dashboardPage(
         tabName = "diffexp",
         h2("Differential Expression Analysis"),
         
-        downloadButton("download_diffexp", "Download Differential Expression Results"),
+        downloadButton("download_all_diffexp", "Download all Results"),
         br(), br(),
         
         # cluster selection
@@ -274,6 +274,9 @@ ui <- dashboardPage(
             title = "Results",
             solidHeader = TRUE,
             status = "primary",
+            
+            downloadButton("download_diffexp", "Download this cluster's results"),
+            br(), br(),
             
             DT::dataTableOutput("diffexp_table")
           )

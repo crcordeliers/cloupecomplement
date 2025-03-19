@@ -336,11 +336,25 @@ server <- function(input, output, session) {
     content = function(file) {
       diffexp_export <- diffexp_results() |> 
         dplyr::select(-gene) |> 
-        dplyr::rename(`% Expressed in Cluster` = pct.1, `% Expressed in Others` = pct.2)
+        dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
       
-      write.csv(diffexp_export, file, row.names = TRUE)
+      write.csv(diffexp_export, file, row.names = FALSE)
     }
   )
+  
+  output$download_all_diffexp <- downloadHandler(
+    filename = function() {
+      paste0("All_DiffExp_Results_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      full_diffexp <- diffexp_all() |> 
+        dplyr::relocate(gene, .before = everything()) |>
+        dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
+      
+      write.csv(full_diffexp, file, row.names = TRUE)
+    }
+  )
+  
   
   diffexp_data <- reactive({
     if (input$use_custom_diffexp) {
