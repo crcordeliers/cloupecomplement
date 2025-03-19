@@ -1,16 +1,16 @@
 checkMart <- function(species, updateMart = FALSE){
-  if(species == "Human"){
+  if (species == "Human") {
     speciesDataset <- "hsapiens_gene_ensembl"
     martFile <- "./data/humanMart.rds"
   }
-  else if(species == "Mouse"){
+  else if (species == "Mouse") {
     speciesDataset <- "mmusculus_gene_ensembl"
     martFile <- "./data/mouseMart.rds"
   }
   if (file.exists(martFile) & updateMart == FALSE) {
     mart <- readRDS(martFile)
   } 
-  else if (!file.exists(martFile) | updateMart == TRUE){
+  else if (!file.exists(martFile) | updateMart == TRUE) {
     mart <- useMart("ensembl", dataset = speciesDataset)
     saveRDS(mart, martFile)
   }
@@ -39,10 +39,10 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
     
     incProgress(0.4, detail = "Normalizing and scaling the data...")
     # Normalize and Scale the data
-    if(normalisation_method == "LogNormalize"){
+    if (normalisation_method == "LogNormalize") {
       seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
       seuratObj <- ScaleData(seuratObj)
-    }else if(normalisation_method == "SCTransform"){
+    } else if (normalisation_method == "SCTransform") {
       DefaultAssay(seuratObj) <- Assays(data_loaded$seuratObj)
       seuratObj <- SCTransform(seuratObj, assay = Assays(data_loaded$seuratObj))
     }
@@ -69,6 +69,9 @@ loadClusterMat <- function(filenameCluster, seuratObj) {
   valid_indices <- !is.na(matched_indices)
   clusterMat <- clusterMat[matched_indices[valid_indices], , drop = FALSE]
   
+  # Order by cluster number to avoid lexicographic order
+  clusterMat[,1] <- factor(clusterMat[,1], levels = mixedsort(unique(clusterMat[,1])))
+  
   return(clusterMat)
 }
 
@@ -76,10 +79,12 @@ loadClusterMat <- function(filenameCluster, seuratObj) {
 prepare_gene_data <- function(gene, data_loaded) {
   countMatrix <- GetAssayData(data_loaded$seuratObj, layer = "data")
   
+  barcodes <- colnames(countMatrix)
+  
   gene_data <- data.frame(
     Expression = countMatrix[gene, ], 
     Barcode = colnames(countMatrix),
-    Cluster = data_loaded$clusterMat[,1]
+    Cluster = data_loaded$clusterMat[barcodes,1]
   )
   
   return(gene_data)
@@ -165,7 +170,7 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
   
   # Set species database for GO terms
   go_species <- ifelse(species == "Human", "org.Hs.eg.db", "org.Mm.eg.db")
-  if(database == "HALLMARK"){
+  if (database == "HALLMARK") {
     hallmark_gene_sets <- msigdbr(species = tolower(species), category = "H")
     hallmark_gene_list <- hallmark_gene_sets |>
       dplyr::select(gs_name, entrez_gene)

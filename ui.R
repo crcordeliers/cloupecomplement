@@ -2,11 +2,13 @@ if (!require("BiocManager")) install.packages("BiocManager", quiet = TRUE)
 if (!require("devtools")) install.packages("devtools", quiet = TRUE)
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
 if (!require("enrichR")) install_github("wjawaid/enrichR")
+if (!require("presto")) install_github("immunogenomics/presto")
+if (!require("ggheatmapper")) install_github("csgroen/ggheatmapper")
 
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
-               Seurat, reshape2, ggpubr, pheatmap, viridis, clusterProfiler,
+               Seurat, reshape2, ggpubr, ggheatmapper, viridis, clusterProfiler,
                org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl, devtools,
-               enrichR, callr, shinyjs)
+               enrichR, callr, shinyjs, gtools, WriteXLS)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -173,7 +175,7 @@ ui <- dashboardPage(
               downloadButton("download_combined_pdf", "Download as PDF"),
               br(), br(),
               
-              # gene selection
+              # Gene selection
               fluidRow(
                 box(
                   width = 12,
@@ -182,25 +184,51 @@ ui <- dashboardPage(
                   status = "info",
                   
                   selectizeInput("gene_select_dotplot", "Select Genes of Interest:",
-                                 choices = NULL, multiple = TRUE)
+                                 choices = NULL, multiple = TRUE),
+                  actionButton("run_heatmap", "Run Heatmap", class = "btn-primary")
                 )
               ),
               
-              # plots
+              tags$script(HTML("
+      Shiny.addCustomMessageHandler('enhanceSelectize', function(inputId) {
+        var selectize = $('#' + inputId).selectize()[0].selectize;
+        
+        if (selectize) {
+          selectize.onPaste = function(e) {
+            var pastedData = (e.originalEvent || e).clipboardData.getData('text');
+            var genes = pastedData.split(/[\\s,]+/).filter(Boolean);
+            selectize.addItems(genes);
+            e.preventDefault();
+          };
+        }
+      });
+    ")),
+              
+              # Results
               fluidRow(
                 box(
-                  width = 6, 
-                  title = "Heatmap", 
+                  title = "Heatmap & Dotplot Results", 
+                  width = 12, 
                   solidHeader = TRUE, 
                   status = "primary",
-                  plotOutput("heatmapPlot")
-                ),
-                box(
-                  width = 6, 
-                  title = "Dotplot", 
-                  solidHeader = TRUE, 
-                  status = "primary",
-                  plotOutput("dotPlot")
+                  
+                  tabsetPanel(
+                    id = "hmap_dotplot_tabs",
+                    
+                    tabPanel(
+                      title = "Heatmap", 
+                      value = "heatmap",
+                      br(), br(),
+                      plotOutput("heatmapPlot", height = "700px")
+                    ),
+                    
+                    tabPanel(
+                      title = "Dotplot", 
+                      value = "dotplot",
+                      br(), br(),
+                      plotOutput("dotPlot", height = "700px")
+                    )
+                  )
                 )
               )
       ),
@@ -212,7 +240,7 @@ ui <- dashboardPage(
         tabName = "diffexp",
         h2("Differential Expression Analysis"),
         
-        downloadButton("download_diffexp", "Download Differential Expression Results"),
+        downloadButton("download_all_diffexp", "Download all Results"),
         br(), br(),
         
         # cluster selection
@@ -246,6 +274,9 @@ ui <- dashboardPage(
             title = "Results",
             solidHeader = TRUE,
             status = "primary",
+            
+            downloadButton("download_diffexp", "Download this cluster's results"),
+            br(), br(),
             
             DT::dataTableOutput("diffexp_table")
           )
@@ -340,7 +371,7 @@ ui <- dashboardPage(
                       br(),
                       downloadButton("download_pathway_plot_pdf", "Download Pathway Plot as PDF"),
                       br(),br(),
-                      plotOutput("pathway_plot", height="700px")
+                      plotOutput("pathway_plot", height = "700px")
                     ),
                     
                     tabPanel(

@@ -42,6 +42,10 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
     updateSelectizeInput(session, "selected_cluster", choices = sorted_clusters, selected = sorted_clusters[1])
     
+    observe({
+      session$sendCustomMessage("enhanceSelectize", "gene_select_dotplot")
+    })
+    
     # Update the filtered out information
     output$data_info <- renderPrint({
       cat("Seurat Object Dimensions:", dim(data_loaded$seuratObj), "\n")
@@ -61,9 +65,9 @@ server <- function(input, output, session) {
   observe({
     timer()
     process <- diffexp_status()
-    if(!is.null(process) && process$is_alive()){
+    if (!is.null(process) && process$is_alive()) {
       diffexp_message("Calculation of differential expression is running, this may take some time depending on hardware...")
-    } else if(!is.null(process) && process$is_alive() == FALSE){
+    } else if (!is.null(process) && process$is_alive() == FALSE) {
       diffexp_all(process$get_result())
       diffexp_status(NULL)
       shinyjs::toggle("diffexp_message_box", anim = TRUE)
@@ -87,7 +91,7 @@ server <- function(input, output, session) {
     req(input$species)
     withProgress(message = "Updating mart...", value = 0, {
       incProgress(0.4, detail = "Loading mart...")
-
+      
       checkMart(input$species, updateMart = TRUE)
       incProgress(0.4, detail = "Saving mart...")
       Sys.sleep(1)
@@ -101,8 +105,8 @@ server <- function(input, output, session) {
     withProgress(message = "Updating gene table...", value = 0, {
       incProgress(0.4, detail = "Querying gene table...")
       mart <- checkMart(input$species)
-
-      if(!is.null(mart)) {
+      
+      if (!is.null(mart)) {
         requestGeneTable(mart, input$species)
       } else {
         showNotification("Failed to load the mart", type = "error")
@@ -174,33 +178,83 @@ server <- function(input, output, session) {
   )
   
   # Heatmap & Dotplot
-  output$heatmapPlot <- renderPlot({
+  heatmap_data <- eventReactive(input$run_heatmap, {
     req(input$gene_select_dotplot, data_loaded$seuratObj)
     
-    DoHeatmap(
-      object = data_loaded$seuratObj,
-      features = input$gene_select_dotplot,
-      group.by = "clusterMat"
-    ) + 
-      scale_fill_viridis(option = "plasma")
+    withProgress(message = "Generating Heatmap...", value = 0, {
+      
+      incProgress(0.2, detail = "Extracting data")
+      
+      genes <- input$gene_select_dotplot
+      gexp <- GetAssayData(data_loaded$seuratObj, slot = "scale.data")[genes, , drop = FALSE]
+      
+      sample_annot <- data_loaded$seuratObj[[]] %>% rownames_to_column("sample")
+      
+      incProgress(0.3, detail = "Processing data")
+      
+      dataHm <- as.data.frame(t(gexp)) %>%
+        rownames_to_column("sample") %>%
+        left_join(sample_annot, by = "sample") %>%
+        tibble() %>%
+        group_by(clusterMat)
+      
+      color_limit <- max(quantile(dataHm[, genes, drop = FALSE], 0.99, na.rm = TRUE),
+                         -quantile(dataHm[, genes, drop = FALSE], 0.01, na.rm = TRUE))
+      
+      incProgress(0.2, detail = "Generating heatmap")
+      
+      hmplot <- ggheatmap(dataHm,
+                          colv = "sample",
+                          rowv = genes,
+                          hm_colors = "RdBu",
+                          scale = TRUE,
+                          center = TRUE, 
+                          hm_color_limits = c(-color_limit, color_limit),
+                          show_dend_col = FALSE,
+                          show_dend_row = FALSE,
+                          show_colnames = FALSE,
+                          show_rownames = TRUE,
+                          colors_title = "Scaled expression (log2 UQ)") +
+        plot_layout(guides = 'collect')
+      
+      incProgress(0.3, detail = "Done")
+      hmplot
+    })
+  })
+  
+  
+  dotplot_data <- eventReactive(input$run_heatmap, {
+    req(input$gene_select_dotplot, data_loaded$seuratObj)
+    
+    withProgress(message = "Generating DotPlot...", value = 0, {
+      incProgress(0.5, detail = "Processing data")
+      
+      plot <- DotPlot(
+        object = data_loaded$seuratObj,
+        features = input$gene_select_dotplot,
+        group.by = "clusterMat"
+      ) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        scale_color_viridis_c(option = "plasma")
+      
+      incProgress(0.5, detail = "Rendering plot")
+      plot
+    })
+  })
+  
+  
+  output$heatmapPlot <- renderPlot({
+    heatmap_data()
   })
   
   output$dotPlot <- renderPlot({
-    req(input$gene_select_dotplot, data_loaded$seuratObj)
-    
-    DotPlot(
-      object = data_loaded$seuratObj,
-      features = input$gene_select_dotplot,
-      group.by = "clusterMat", 
-    ) +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      scale_color_viridis_c(option = "plasma")
+    dotplot_data()
   })
   
   output$download_combined_pdf <- downloadHandler(
     filename = function() {
       first_genes <- input$gene_select_dotplot[!is.na(input$gene_select_dotplot[1:3])][1:3]
-      paste0(Sys.Date(), "_heatmap_dotplot_", paste(first_genes, collapse = "_"), ".pdf", Sys.Date(), ".pdf", sep = "")
+      paste0(Sys.Date(), "_heatmap_dotplot_", paste(first_genes, collapse = "_"), ".pdf")
     },
     content = function(file) {
       pdf(file, width = 8, height = 12)
@@ -241,8 +295,8 @@ server <- function(input, output, session) {
     diffexp <- trigger_values$diffexp
     
     selected_cluster <- input$selected_cluster
-
-    if(!is.null(diffexp_all())){
+    
+    if (!is.null(diffexp_all())) {
       diffexp <- diffexp_all() |>
         filter(str_detect(cluster, selected_cluster)) |>
         dplyr::select(-contains("cluster"))
@@ -266,7 +320,11 @@ server <- function(input, output, session) {
       diffexp_results(diffexp)
       
       output$diffexp_table <- DT::renderDataTable({
-        DT::datatable(diffexp_results(), options = list(pageLength = 10, autoWidth = TRUE))
+        diffexp_display <- diffexp_results() |> 
+          dplyr::select(-gene) |> 
+          dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
+        
+        DT::datatable(diffexp_display, options = list(pageLength = 10, autoWidth = TRUE))
       })
     }
   })
@@ -276,9 +334,27 @@ server <- function(input, output, session) {
       paste0("DiffExp_Cluster", input$selected_cluster, "_vs_all_others.csv")
     },
     content = function(file) {
-      write.csv(diffexp_results(), file)
+      diffexp_export <- diffexp_results() |> 
+        dplyr::select(-gene) |> 
+        dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
+      
+      write.csv(diffexp_export, file, row.names = FALSE)
     }
   )
+  
+  output$download_all_diffexp <- downloadHandler(
+    filename = function() {
+      paste0("All_DiffExp_Results_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      full_diffexp <- diffexp_all() |> 
+        dplyr::relocate(gene, .before = everything()) |>
+        dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
+      
+      write.csv(full_diffexp, file, row.names = TRUE)
+    }
+  )
+  
   
   diffexp_data <- reactive({
     if (input$use_custom_diffexp) {
@@ -326,7 +402,7 @@ server <- function(input, output, session) {
         clust_ranks <- setNames(as.numeric(cluster_genes$avg_log2FC), rownames(cluster_genes))
         clust_ranks <- sort(clust_ranks[!duplicated(names(clust_ranks))], decreasing = TRUE)
         
-        if(input$celltype_method == "FGSEA"){
+        if (input$celltype_method == "FGSEA") {
           enrichment_output <- fgsea::fgsea(pathways = pathways, stats = clust_ranks)
           enrichment_results[[as.character(clust)]] <- enrichment_output |>
             as.data.frame() |>
@@ -334,7 +410,7 @@ server <- function(input, output, session) {
             dplyr::arrange(padj)
           barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
                                                              aes(x = reorder(pathway, -padj), y = NES, fill = padj))
-        } else if(input$celltype_method == "Enrichr Web Query"){
+        } else if (input$celltype_method == "Enrichr Web Query") {
           enrichment_output <- enrichR::enrichr(names(clust_ranks), databases = input$celltype_db)
           enrichment_results[[as.character(clust)]] <- enrichment_output[[1]] |>
             as.data.frame() |>
@@ -424,8 +500,6 @@ server <- function(input, output, session) {
       )
     })
   })
-  
-  
   
   # Run pathway analysis
   observeEvent(input$run_pathway, {
