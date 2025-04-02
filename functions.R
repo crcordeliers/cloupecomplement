@@ -22,7 +22,8 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
     incProgress(0.1, detail = "Preparing data...")
     data <- Read10X(file.path(folderCellRangerOut, "/filtered_feature_bc_matrix"))
     seuratObj <- CreateSeuratObject(counts = data)
-
+    seuratObj$sample <- sub(".*-", "", colnames(seuratObj))
+    
     incProgress(0.1, detail = "Filtering genes...")
     # Filter genes based on minimum expression in % of cells
     percent_expressed <- rowSums(GetAssayData(seuratObj, layer = "counts") > 0) / ncol(seuratObj) * 100
@@ -42,14 +43,20 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
     if (normalisation_method == "LogNormalize") {
       seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
       seuratObj <- ScaleData(seuratObj)
+      seuratObj <- FindVariableFeatures(seuratObj)
+      incProgress(0.2, detail = "Correcting batch effect...")
+      seuratObj <- RunPCA(seuratObj)
+      seuratObj <- RunHarmony(seuratObj, group.by.vars = "sample")
     } else if (normalisation_method == "SCTransform") {
-      DefaultAssay(seuratObj) <- Assays(data_loaded$seuratObj)
-      seuratObj <- SCTransform(seuratObj, assay = Assays(data_loaded$seuratObj))
+      options(future.globals.maxSize = 2 * 1024^3)
+      seuratObj <- SCTransform(seuratObj, vars.to.regress = "sample")
+      seuratObj <- RunPCA(seuratObj)
+      seuratObj <- RunHarmony(seuratObj, group.by.vars = "sample")
     }
     
-    incProgress(0.1, detail = "Loading appropriate mart...")
+    incProgress(0.2, detail = "Loading appropriate mart...")
     mart <- checkMart(species)
-
+    
     # Return the filtered seurat object and the counts of filtered genes and spots
     return(list(seuratObj = seuratObj, filtered_genes = length(filtered_genes), 
                 filtered_spots = length(filtered_spots), mart = mart))
