@@ -32,7 +32,7 @@ server <- function(input, output, session) {
     
     Idents(data_loaded$seuratObj) <- data_loaded$seuratObj[[]]["clusterMat"][[1]]
     
-    gene_expression_sums <- Matrix::rowSums(data_loaded$seuratObj[[Assays(data_loaded$seuratObj)]]$counts)
+    gene_expression_sums <- Matrix::rowSums(data_loaded$seuratObj[[DefaultAssay(data_loaded$seuratObj)]]$counts)
     ordered_genes <- names(sort(gene_expression_sums, decreasing = TRUE))
     
     sorted_clusters <- sort(unique(data_loaded$clusterMat[,1]))
@@ -188,13 +188,13 @@ server <- function(input, output, session) {
       genes <- input$gene_select_dotplot
       gexp <- GetAssayData(data_loaded$seuratObj, slot = "scale.data")[genes, , drop = FALSE]
       
-      sample_annot <- data_loaded$seuratObj[[]] %>% rownames_to_column("sample")
+      sample_annot <- data_loaded$seuratObj[[]] %>% rownames_to_column("spots")
       
       incProgress(0.3, detail = "Processing data")
       
       dataHm <- as.data.frame(t(gexp)) %>%
-        rownames_to_column("sample") %>%
-        left_join(sample_annot, by = "sample") %>%
+        rownames_to_column("spots") %>%
+        left_join(sample_annot, by = "spots") %>%
         tibble() %>%
         group_by(clusterMat)
       
@@ -204,7 +204,7 @@ server <- function(input, output, session) {
       incProgress(0.2, detail = "Generating heatmap")
       
       hmplot <- ggheatmap(dataHm,
-                          colv = "sample",
+                          colv = "spots",
                           rowv = genes,
                           hm_colors = "RdBu",
                           scale = TRUE,
@@ -298,11 +298,11 @@ server <- function(input, output, session) {
     
     if (!is.null(diffexp_all())) {
       diffexp <- diffexp_all() |>
-        filter(str_detect(cluster, selected_cluster)) |>
+        filter(cluster == selected_cluster) |>
         dplyr::select(-contains("cluster"))
       
       if ("gene" %in% colnames(diffexp)) {
-        rownames(diffexp) <- diffexp$gene
+        rownames(diffexp) <- as.character(diffexp$gene)
       } else {
         warning("The 'gene' column is missing in the differential expression results.")
       }
