@@ -194,15 +194,38 @@ ui <- dashboardPage(
               
               tags$script(HTML("
       Shiny.addCustomMessageHandler('enhanceSelectize', function(inputId) {
-        var selectize = $('#' + inputId).selectize()[0].selectize;
-        
+        var $select = $('#' + inputId);
+        var selectize = $select[0].selectize;
+
         if (selectize) {
-          selectize.onPaste = function(e) {
-            var pastedData = (e.originalEvent || e).clipboardData.getData('text');
-            var genes = pastedData.split(/[\\s,]+/).filter(Boolean);
-            selectize.addItems(genes);
+          // Remove any existing paste handler
+          selectize.$control_input.off('paste');
+
+          // Add paste event handler
+          selectize.$control_input.on('paste', function(e) {
             e.preventDefault();
-          };
+            var pastedData = (e.originalEvent || e).clipboardData.getData('text/plain');
+
+            // Split by newlines, commas, semicolons, or spaces
+            var genes = pastedData.split(/[\\n\\r,;\\s]+/).filter(function(item) {
+              return item.trim().length > 0;
+            });
+
+            // Add each gene as an item
+            genes.forEach(function(gene) {
+              var trimmedGene = gene.trim();
+              // Check if the gene exists in available options
+              if (selectize.options[trimmedGene]) {
+                selectize.addItem(trimmedGene, true);
+              } else {
+                // Try to add it anyway (will work if server-side selectize allows it)
+                selectize.addOption({value: trimmedGene, text: trimmedGene});
+                selectize.addItem(trimmedGene, true);
+              }
+            });
+
+            selectize.refreshOptions(false);
+          });
         }
       });
     ")),

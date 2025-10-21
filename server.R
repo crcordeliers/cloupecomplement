@@ -41,10 +41,9 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "gene_select_dotplot", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
     updateSelectizeInput(session, "selected_cluster", choices = sorted_clusters, selected = sorted_clusters[1])
-    
-    observe({
-      session$sendCustomMessage("enhanceSelectize", "gene_select_dotplot")
-    })
+
+    # Enable clipboard paste functionality for the dotplot gene selector
+    session$sendCustomMessage("enhanceSelectize", "gene_select_dotplot")
     
     # Update the filtered out information
     output$data_info <- renderPrint({
