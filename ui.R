@@ -1,9 +1,11 @@
 if (!require("BiocManager")) install.packages("BiocManager", quiet = TRUE)
 if (!require("devtools")) install.packages("devtools", quiet = TRUE)
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
-if (!require("enrichR")) install_github("wjawaid/enrichR")
-if (!require("presto")) install_github("immunogenomics/presto")
-if (!require("ggheatmapper")) install_github("csgroen/ggheatmapper")
+if (!require("enrichR")) remotes::install_github("wjawaid/enrichR")
+if (!require("presto")) remotes::install_github("immunogenomics/presto")
+if (!require("ggheatmapper")) remotes::install_github("csgroen/ggheatmapper")
+
+options(shiny.maxRequestSize=100*1024^2)
 
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, ggheatmapper, viridis, clusterProfiler,
@@ -41,11 +43,12 @@ ui <- dashboardPage(
 
             fluidRow(
               column(6,
-                     textInput("cellranger_out", "Enter CellRanger Output Folder Path", 
-                               placeholder = "/path/to/cellranger/outs")
+                     fileInput("h5_file", "Upload filtered_feature_bc_matrix.h5 file (max 100MB)",
+                               accept = c(".h5", ".hdf5"), placeholder = "No file selected"),
+                     helpText("For Visium HD: use binned_outputs/square_008um/filtered_feature_bc_matrix.h5")
               ),
               column(6, 
-                     fileInput("cluster_csv", "Choose Cluster CSV File", 
+                     fileInput("cluster_csv", "Choose Cluster CSV File (max 100MB)",
                                accept = ".csv", placeholder = "No file selected")
               )
             )

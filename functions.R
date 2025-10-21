@@ -17,10 +17,10 @@ checkMart <- function(species, updateMart = FALSE){
   return(mart)
 }
 
-loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_gene_cutoff, species, normalisation_method){
+loadAndPreprocess <- function(h5FilePath, gene_expression_cutoff, spot_gene_cutoff, species, normalisation_method){
   withProgress(message = "Loading data...", value = 0, {
     incProgress(0.1, detail = "Preparing data...")
-    data <- Read10X(file.path(folderCellRangerOut, "/filtered_feature_bc_matrix"))
+    data <- Read10X_h5(h5FilePath)
     seuratObj <- CreateSeuratObject(counts = data)
     seuratObj$sample <- sub(".*-", "", colnames(seuratObj))
     
@@ -44,14 +44,20 @@ loadAndPreprocess <- function(folderCellRangerOut, gene_expression_cutoff, spot_
       seuratObj <- NormalizeData(seuratObj, normalization.method = "LogNormalize")
       seuratObj <- ScaleData(seuratObj)
       seuratObj <- FindVariableFeatures(seuratObj)
+      if (length(unique(seuratObj$sample)) > 1) {
       incProgress(0.2, detail = "Correcting batch effect...")
       seuratObj <- RunPCA(seuratObj)
       seuratObj <- RunHarmony(seuratObj, group.by.vars = "sample")
+      }
     } else if (normalisation_method == "SCTransform") {
       options(future.globals.maxSize = 2 * 1024^3)
+      if (length(unique(seuratObj$sample)) > 1) {
       seuratObj <- SCTransform(seuratObj, vars.to.regress = "sample")
       seuratObj <- RunPCA(seuratObj)
       seuratObj <- RunHarmony(seuratObj, group.by.vars = "sample")
+      } else {
+        seuratObj <- SCTransform(seuratObj)
+      }
     }
     
     incProgress(0.2, detail = "Loading appropriate mart...")

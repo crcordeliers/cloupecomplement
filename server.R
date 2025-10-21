@@ -16,13 +16,13 @@ server <- function(input, output, session) {
 
   # Event to load data when the user clicks the load button
   observeEvent(input$load_data, {
-    req(input$cellranger_out, input$cluster_csv, input$gene_expression_cutoff,
+    req(input$h5_file, input$cluster_csv, input$gene_expression_cutoff,
         input$spot_gene_cutoff, input$species, input$normalisation_method)
     
-    folderCellRangerOut <- input$cellranger_out
+    h5FilePath <- input$h5_file$datapath
     filenameCluster <- input$cluster_csv$datapath
     
-    filter_results <- loadAndPreprocess(folderCellRangerOut, input$gene_expression_cutoff,
+    filter_results <- loadAndPreprocess(h5FilePath, input$gene_expression_cutoff,
                                         input$spot_gene_cutoff, input$species,
                                         input$normalisation_method)
     data_loaded$seuratObj <- filter_results$seuratObj
