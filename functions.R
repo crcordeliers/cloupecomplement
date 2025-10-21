@@ -210,7 +210,8 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
   # ORA method
   if (method == "ORA") {
     gene_list <- genes |>
-      dplyr::filter(p_val_adj <= 0.05)
+      dplyr::filter(p_val_adj <= 0.05) |>
+      dplyr::filter(avg_log2FC >= 0)
     
     result <- switch(database,
                      GO = enrichGO(gene = gene_list$ensembl_gene_id,
