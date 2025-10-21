@@ -18,10 +18,10 @@ server <- function(input, output, session) {
   observeEvent(input$load_data, {
     req(input$h5_file, input$cluster_csv, input$gene_expression_cutoff,
         input$spot_gene_cutoff, input$species, input$normalisation_method)
-    
+
     h5FilePath <- input$h5_file$datapath
     filenameCluster <- input$cluster_csv$datapath
-    
+
     filter_results <- loadAndPreprocess(h5FilePath, input$gene_expression_cutoff,
                                         input$spot_gene_cutoff, input$species,
                                         input$normalisation_method)
@@ -297,32 +297,37 @@ server <- function(input, output, session) {
     selected_cluster <- input$selected_cluster
     
     if (!is.null(diffexp_all())) {
-      diffexp <- diffexp_all() |>
+      raw_diffexp <- diffexp_all() |>
         filter(cluster == selected_cluster) |>
         dplyr::select(-contains("cluster"))
       
-      if ("gene" %in% colnames(diffexp)) {
-        rownames(diffexp) <- as.character(diffexp$gene)
+      if ("gene" %in% colnames(raw_diffexp)) {
+        rownames(raw_diffexp) <- as.character(raw_diffexp$gene)
       } else {
         warning("The 'gene' column is missing in the differential expression results.")
       }
       
-      if ("p_val" %in% colnames(diffexp)) {
-        diffexp$p_val <- format_pval(diffexp$p_val)
-      }
-      if ("p_val_adj" %in% colnames(diffexp)) {
-        diffexp$p_val_adj <- format_pval(diffexp$p_val_adj)
-      }
-      if ("avg_log2FC" %in% colnames(diffexp)) {
-        diffexp$avg_log2FC <- format_pval(diffexp$avg_log2FC)
-      }
-      
-      diffexp_results(diffexp)
+      # Store unformatted version
+      diffexp_results(raw_diffexp)
       
       output$diffexp_table <- DT::renderDataTable({
-        diffexp_display <- diffexp_results() |> 
+        # Create a copy for display formatting
+        diffexp_display <- raw_diffexp
+        
+        if ("p_val" %in% colnames(diffexp_display)) {
+          diffexp_display$p_val <- format_pval(diffexp_display$p_val)
+        }
+        if ("p_val_adj" %in% colnames(diffexp_display)) {
+          diffexp_display$p_val_adj <- format_pval(diffexp_display$p_val_adj)
+        }
+        if ("avg_log2FC" %in% colnames(diffexp_display)) {
+          diffexp_display$avg_log2FC <- format_pval(diffexp_display$avg_log2FC)
+        }
+        
+        diffexp_display <- diffexp_display |> 
           dplyr::select(-gene) |> 
-          dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
+          dplyr::rename("Proportion Expressed in Cluster" = pct.1, 
+                        "Proportion Expressed in Others" = pct.2)
         
         DT::datatable(diffexp_display, options = list(pageLength = 10, autoWidth = TRUE))
       })
@@ -336,7 +341,7 @@ server <- function(input, output, session) {
     content = function(file) {
       diffexp_export <- diffexp_results() |> 
         dplyr::select(-gene) |> 
-        dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
+        dplyr::rename("Proportion Expressed in Cluster" = pct.1, "Proportion Expressed in Others" = pct.2)
       
       write.csv(diffexp_export, file, row.names = FALSE)
     }
@@ -392,7 +397,7 @@ server <- function(input, output, session) {
       
       # Number of clusters for progress calculation
       total_clusters <- length(unique(genes_sorted$cluster))
-      cluster_progress_step <- 1 / total_clusters  # Calculate progress step per cluster
+      cluster_progress_step <- 1 / total_clusters
       
       for (clust in sort(unique(genes_sorted$cluster))) {
         # Update progress for each cluster iteration

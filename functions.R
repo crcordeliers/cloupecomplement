@@ -45,16 +45,16 @@ loadAndPreprocess <- function(h5FilePath, gene_expression_cutoff, spot_gene_cuto
       seuratObj <- ScaleData(seuratObj)
       seuratObj <- FindVariableFeatures(seuratObj)
       if (length(unique(seuratObj$sample)) > 1) {
-      incProgress(0.2, detail = "Correcting batch effect...")
-      seuratObj <- RunPCA(seuratObj)
-      seuratObj <- RunHarmony(seuratObj, group.by.vars = "sample")
+        incProgress(0.2, detail = "Correcting batch effect...")
+        seuratObj <- RunPCA(seuratObj)
+        seuratObj <- RunHarmony(seuratObj, group.by.vars = "sample")
       }
     } else if (normalisation_method == "SCTransform") {
       options(future.globals.maxSize = 2 * 1024^3)
       if (length(unique(seuratObj$sample)) > 1) {
-      seuratObj <- SCTransform(seuratObj, vars.to.regress = "sample")
-      seuratObj <- RunPCA(seuratObj)
-      seuratObj <- RunHarmony(seuratObj, group.by.vars = "sample")
+        seuratObj <- SCTransform(seuratObj, vars.to.regress = "sample")
+        seuratObj <- RunPCA(seuratObj)
+        seuratObj <- RunHarmony(seuratObj, group.by.vars = "sample")
       } else {
         seuratObj <- SCTransform(seuratObj)
       }
@@ -150,13 +150,23 @@ format_pval <- function(pval, threshold = 1e-6) {
 }
 
 requestGeneTable <- function(mart, species){
-  full_gene_map <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "entrezgene_id"),
-                         mart = mart)
+  if (tolower(species) == "mouse") {
+    attrs <- c("ensembl_gene_id", "mgi_symbol", "entrezgene_id")
+  } else {
+    attrs <- c("ensembl_gene_id", "hgnc_symbol", "entrezgene_id")
+  }
+  
+  full_gene_map <- getBM(attributes = attrs, mart = mart)
   saveRDS(full_gene_map, paste0("./data/", tolower(species), "GeneTable.rds"))
 }
 
 convertGeneMap <- function(genes, mart, species){
   genes <- rownames(genes)
+  
+  symbol_col <- switch(tolower(species),
+                       "human" = "hgnc_symbol",
+                       "mouse" = "mgi_symbol",
+                       stop("Unsupported species"))
   
   tryCatch({
     full_gene_map <- readRDS(paste0("./data/", tolower(species), "GeneTable.rds"))
@@ -167,8 +177,8 @@ convertGeneMap <- function(genes, mart, species){
   })
   
   gene_map <- full_gene_map |>
-    dplyr::filter(hgnc_symbol %in% genes) |>
-    dplyr::distinct(hgnc_symbol, .keep_all = TRUE)
+    dplyr::filter(.data[[symbol_col]] %in% genes) |>
+    dplyr::distinct(.data[[symbol_col]], .keep_all = TRUE)
   
   return(gene_map)
 }
@@ -176,13 +186,21 @@ convertGeneMap <- function(genes, mart, species){
 runPathwayAnalysis <- function(genes, method, database, species, mart) {
   incProgress(0.1, detail = "Running Pathway Analysis")
   
-  # Convert genes to Ensembl format
-  gene_map <- convertGeneMap(genes, mart, species)
-  genes <- merge(genes, gene_map, by.x = "row.names", by.y = "hgnc_symbol")
-
+  # Set gene symbol column based on species
+  gene_symbol_col <- ifelse(tolower(species) == "mouse", "mgi_symbol", "hgnc_symbol")
   
-  # Set species database for GO terms
-  go_species <- ifelse(species == "Human", "org.Hs.eg.db", "org.Mm.eg.db")
+  # Convert genes to Ensembl/Entrez
+  gene_map <- convertGeneMap(genes, mart, species)
+  genes[[gene_symbol_col]] <- rownames(genes)
+  genes <- merge(genes, gene_map, by.x = gene_symbol_col, by.y = gene_symbol_col)
+  
+  # Set OrgDb for GO terms
+  go_species <- switch(tolower(species),
+                       human = "org.Hs.eg.db",
+                       mouse = "org.Mm.eg.db",
+                       stop("Unsupported species for GO analysis"))
+  
+  # Prepare hallmark gene sets if needed
   if (database == "HALLMARK") {
     hallmark_gene_sets <- msigdbr(species = tolower(species), category = "H")
     hallmark_gene_list <- hallmark_gene_sets |>
@@ -192,21 +210,20 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
   # ORA method
   if (method == "ORA") {
     gene_list <- genes |>
-      filter(p_val_adj <= 0.05)
-
-    # Enrichment based on the selected database
+      dplyr::filter(p_val_adj <= 0.05)
+    
     result <- switch(database,
                      GO = enrichGO(gene = gene_list$ensembl_gene_id,
-                                   OrgDb = go_species,
+                                   OrgDb = get(go_species),
                                    keyType = "ENSEMBL",
                                    ont = "BP",
                                    pAdjustMethod = "BH",
                                    pvalueCutoff = 0.05,
                                    qvalueCutoff = 0.2),
-                     KEGG = enrichKEGG(gene = gene_map$entrezgene_id,
-                                       organism = ifelse(species == "Human", "hsa", "mmu"),
+                     KEGG = enrichKEGG(gene = gene_list$entrezgene_id,
+                                       organism = ifelse(tolower(species) == "human", "hsa", "mmu"),
                                        pvalueCutoff = 0.05),
-                     HALLMARK = enricher(gene = gene_map$entrezgene_id,
+                     HALLMARK = enricher(gene = gene_list$entrezgene_id,
                                          TERM2GENE = hallmark_gene_list,
                                          pAdjustMethod = "BH",
                                          pvalueCutoff = 0.05),
@@ -215,29 +232,28 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
     # FGSEA method
   } else if (method == "FGSEA") {
     genes_sorted <- genes |>
-      dplyr::arrange(desc(avg_log2FC))
-    genes_sorted$hgnc_symbol <- rownames(genes_sorted)
-    genes_sorted <- merge(genes_sorted, gene_map, by = "hgnc_symbol", by.y = "entrezgene_id")
-    genes_sorted <- genes_sorted[!is.na(genes_sorted$entrezgene_id),]
-
+      dplyr::arrange(desc(avg_log2FC)) |>
+      dplyr::filter(!is.na(entrezgene_id))
+    
     ranks <- as.numeric(genes_sorted$avg_log2FC)
     names(ranks) <- genes_sorted$entrezgene_id
     ranks <- sort(ranks, decreasing = TRUE)
     ranks <- ranks[!duplicated(names(ranks))]
     
     result <- switch(database,
-                         GO = gseGO(geneList = ranks,
-                           OrgDb = go_species,
-                           ont = "BP",
-                           pvalueCutoff = 1),
-                         KEGG = gseKEGG(geneList = ranks,
-                                        keyType = "ncbi-geneid",
-                                        organism = ifelse(species == "Human", "hsa", "mmu"),
-                                        pvalueCutoff = 1),
-                         HALLMARK = GSEA(ranks, 
-                                         TERM2GENE = hallmark_gene_list,
-                                         pvalueCutoff = 1),
-                         stop("Unsupported database"))
+                     GO = gseGO(geneList = ranks,
+                                OrgDb = get(go_species),
+                                ont = "BP",
+                                keyType = "ENTREZID",
+                                pvalueCutoff = 1),
+                     KEGG = gseKEGG(geneList = ranks,
+                                    keyType = "ncbi-geneid",
+                                    organism = ifelse(tolower(species) == "human", "hsa", "mmu"),
+                                    pvalueCutoff = 1),
+                     HALLMARK = GSEA(ranks,
+                                     TERM2GENE = hallmark_gene_list,
+                                     pvalueCutoff = 1),
+                     stop("Unsupported database"))
     
   } else {
     stop("Unsupported method")
@@ -245,3 +261,4 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
   
   return(result)
 }
+

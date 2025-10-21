@@ -9,7 +9,7 @@ options(shiny.maxRequestSize=100*1024^2)
 
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, ggheatmapper, viridis, clusterProfiler,
-               org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl, devtools,
+               org.Hs.eg.db, org.Mm.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl, devtools,
                enrichR, callr, shinyjs, gtools, WriteXLS, harmony)
 
 # setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
@@ -47,7 +47,7 @@ ui <- dashboardPage(
                                accept = c(".h5", ".hdf5"), placeholder = "No file selected"),
                      helpText("For Visium HD: use binned_outputs/square_008um/filtered_feature_bc_matrix.h5")
               ),
-              column(6, 
+              column(6,
                      fileInput("cluster_csv", "Choose Cluster CSV File (max 100MB)",
                                accept = ".csv", placeholder = "No file selected")
               )
