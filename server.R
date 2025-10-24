@@ -4,7 +4,12 @@ server <- function(input, output, session) {
   disable("use_custom_diffexp")
   
   # Reactive values for loaded data and comparisons
-  data_loaded <- reactiveValues(seuratObj = NULL, clusterMat = NULL)
+  data_loaded <- reactiveValues(
+    seuratObj = NULL,
+    seuratObj_full = NULL,  # Full object for differential expression (if sketched)
+    clusterMat = NULL,
+    is_sketched = FALSE
+  )
   comparisons <- reactiveVal(list())
   diffexp_all <- reactiveVal(NULL)
   diffexp_results <- reactiveVal(NULL)
@@ -22,19 +27,27 @@ server <- function(input, output, session) {
     h5FilePath <- input$h5_file$datapath
     filenameCluster <- input$cluster_csv$datapath
 
+    # Get Visium HD parameters
+    is_visium_hd <- isTRUE(input$is_visium_hd)
+    sketch_size <- ifelse(is_visium_hd, input$sketch_size, 5000)
+
     filter_results <- loadAndPreprocess(h5FilePath, input$gene_expression_cutoff,
                                         input$spot_gene_cutoff, input$species,
-                                        input$normalisation_method)
+                                        input$normalisation_method,
+                                        is_visium_hd = is_visium_hd,
+                                        sketch_size = sketch_size)
     data_loaded$seuratObj <- filter_results$seuratObj
+    data_loaded$seuratObj_full <- filter_results$seuratObj_full
+    data_loaded$is_sketched <- filter_results$is_sketched
     data_loaded$mart <- filter_results$mart
     data_loaded$clusterMat <- loadClusterMat(filenameCluster, data_loaded$seuratObj)
     data_loaded$seuratObj[[]]["clusterMat"] <- data_loaded$clusterMat
-    
+
     Idents(data_loaded$seuratObj) <- data_loaded$seuratObj[[]]["clusterMat"][[1]]
-    
+
     gene_expression_sums <- Matrix::rowSums(data_loaded$seuratObj[[DefaultAssay(data_loaded$seuratObj)]]$counts)
     ordered_genes <- names(sort(gene_expression_sums, decreasing = TRUE))
-    
+
     sorted_clusters <- sort(unique(data_loaded$clusterMat[,1]))
 
     updateSelectizeInput(session, "gene_select", choices = ordered_genes, server = TRUE)
@@ -44,18 +57,33 @@ server <- function(input, output, session) {
 
     # Enable clipboard paste functionality for the dotplot gene selector
     session$sendCustomMessage("enhanceSelectize", "gene_select_dotplot")
-    
+
     # Update the filtered out information
     output$data_info <- renderPrint({
       cat("Seurat Object Dimensions:", dim(data_loaded$seuratObj), "\n")
       cat("Cluster Matrix Dimensions:", dim(data_loaded$clusterMat), "\n")
       cat("Filtered out genes:", filter_results$filtered_genes, "\n")
       cat("Filtered out spots:", filter_results$filtered_spots, "\n")
+      if (data_loaded$is_sketched) {
+        cat("Dataset is sketched for visualization (", ncol(data_loaded$seuratObj),
+            " spots from ", ncol(data_loaded$seuratObj_full), " total)\n", sep = "")
+      }
     })
-    
+
     # Pre-calculate diffexp results while user is busy looking at something else
-    process <- callr::r_bg(FindAllMarkers, 
-      args = list(data_loaded$seuratObj),
+    # Use full object if available (for Visium HD), otherwise use the main object
+    diffexp_obj <- if (!is.null(data_loaded$seuratObj_full)) {
+      # Need to load cluster info for full object
+      clusterMat_full <- loadClusterMat(filenameCluster, data_loaded$seuratObj_full)
+      data_loaded$seuratObj_full[[]]["clusterMat"] <- clusterMat_full
+      Idents(data_loaded$seuratObj_full) <- data_loaded$seuratObj_full[[]]["clusterMat"][[1]]
+      data_loaded$seuratObj_full
+    } else {
+      data_loaded$seuratObj
+    }
+
+    process <- callr::r_bg(FindAllMarkers,
+      args = list(diffexp_obj),
       package = "Seurat")
     diffexp_status(process)
   })

@@ -17,27 +17,39 @@ checkMart <- function(species, updateMart = FALSE){
   return(mart)
 }
 
-loadAndPreprocess <- function(h5FilePath, gene_expression_cutoff, spot_gene_cutoff, species, normalisation_method){
+loadAndPreprocess <- function(h5FilePath, gene_expression_cutoff, spot_gene_cutoff, species, normalisation_method, is_visium_hd = FALSE, sketch_size = 5000){
   withProgress(message = "Loading data...", value = 0, {
     incProgress(0.1, detail = "Preparing data...")
     data <- Read10X_h5(h5FilePath)
     seuratObj <- CreateSeuratObject(counts = data)
     seuratObj$sample <- sub(".*-", "", colnames(seuratObj))
-    
+
     incProgress(0.1, detail = "Filtering genes...")
     # Filter genes based on minimum expression in % of cells
     percent_expressed <- rowSums(GetAssayData(seuratObj, layer = "counts") > 0) / ncol(seuratObj) * 100
     genes_to_keep <- names(percent_expressed[percent_expressed >= gene_expression_cutoff])
     filtered_genes <- setdiff(rownames(seuratObj), genes_to_keep)
     seuratObj <- subset(seuratObj, features = genes_to_keep)
-    
+
     incProgress(0.1, detail = "Filtering spots...")
     # Filter spots based on minimum number of genes expressed per spot
     expressed_genes_per_spot <- colSums(GetAssayData(seuratObj, layer = "counts") > 0)
     spots_to_keep <- names(expressed_genes_per_spot[expressed_genes_per_spot >= spot_gene_cutoff])
     filtered_spots <- setdiff(colnames(seuratObj), spots_to_keep)
     seuratObj <- subset(seuratObj, cells = spots_to_keep)
-    
+
+    # Store the full object before sketching (if Visium HD)
+    seuratObj_full <- NULL
+    if (is_visium_hd && ncol(seuratObj) > sketch_size) {
+      incProgress(0.05, detail = paste0("Creating sketched dataset (", sketch_size, " spots)..."))
+      # Store full object for differential expression
+      seuratObj_full <- seuratObj
+      # Create sketched object for visualization and other analyses
+      set.seed(42)  # For reproducibility
+      sketch_cells <- sample(colnames(seuratObj), size = min(sketch_size, ncol(seuratObj)))
+      seuratObj <- subset(seuratObj, cells = sketch_cells)
+    }
+
     incProgress(0.4, detail = "Normalizing and scaling the data...")
     # Normalize and Scale the data
     if (normalisation_method == "LogNormalize") {
@@ -49,6 +61,13 @@ loadAndPreprocess <- function(h5FilePath, gene_expression_cutoff, spot_gene_cuto
         seuratObj <- RunPCA(seuratObj)
         seuratObj <- RunHarmony(seuratObj, group.by.vars = "sample")
       }
+
+      # Normalize full object for differential expression (if exists)
+      if (!is.null(seuratObj_full)) {
+        incProgress(0.05, detail = "Normalizing full dataset for differential expression...")
+        seuratObj_full <- NormalizeData(seuratObj_full, normalization.method = "LogNormalize")
+        seuratObj_full <- FindVariableFeatures(seuratObj_full)
+      }
     } else if (normalisation_method == "SCTransform") {
       options(future.globals.maxSize = 2 * 1024^3)
       if (length(unique(seuratObj$sample)) > 1) {
@@ -58,14 +77,27 @@ loadAndPreprocess <- function(h5FilePath, gene_expression_cutoff, spot_gene_cuto
       } else {
         seuratObj <- SCTransform(seuratObj)
       }
+
+      # Normalize full object for differential expression (if exists)
+      if (!is.null(seuratObj_full)) {
+        incProgress(0.05, detail = "Normalizing full dataset for differential expression...")
+        if (length(unique(seuratObj_full$sample)) > 1) {
+          seuratObj_full <- SCTransform(seuratObj_full, vars.to.regress = "sample")
+        } else {
+          seuratObj_full <- SCTransform(seuratObj_full)
+        }
+      }
     }
-    
+
     incProgress(0.2, detail = "Loading appropriate mart...")
     mart <- checkMart(species)
-    
+
     # Return the filtered seurat object and the counts of filtered genes and spots
-    return(list(seuratObj = seuratObj, filtered_genes = length(filtered_genes), 
-                filtered_spots = length(filtered_spots), mart = mart))
+    return(list(seuratObj = seuratObj, seuratObj_full = seuratObj_full,
+                filtered_genes = length(filtered_genes),
+                filtered_spots = length(filtered_spots),
+                mart = mart,
+                is_sketched = !is.null(seuratObj_full)))
   })
 }
 
@@ -270,7 +302,7 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
       # Convert each ID to gene symbol
       converted <- sapply(gene_ids, function(id) {
         original_id <- id  # Keep original ID in case we can't convert
-
+        
         # Try exact match first (Entrez or ENSEMBL)
         match_row <- gene_map[gene_map$entrezgene_id == id | gene_map$ensembl_gene_id == id, ]
 
