@@ -207,13 +207,14 @@ server <- function(input, output, session) {
                           rowv = genes,
                           hm_colors = "RdBu",
                           scale = TRUE,
-                          center = TRUE, 
+                          center = TRUE,
                           hm_color_limits = c(-color_limit, color_limit),
                           show_dend_col = FALSE,
                           show_dend_row = FALSE,
                           show_colnames = FALSE,
                           show_rownames = TRUE,
-                          colors_title = "Scaled expression (log2 UQ)") +
+                          colors_title = "Scaled expression (log2 UQ)",
+                          raster = TRUE) +
         plot_layout(guides = 'collect')
       
       incProgress(0.3, detail = "Done")
@@ -412,33 +413,55 @@ server <- function(input, output, session) {
             as.data.frame() |>
             dplyr::filter(NES >= 0) |>
             dplyr::arrange(padj)
-          barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
-                                                             aes(x = reorder(pathway, -padj), y = NES, fill = padj))
+
+          # Prepare top results with -log10(padj) for visualization
+          top_results <- head(enrichment_results[[as.character(clust)]], 10)
+          top_results$neg_log10_padj <- -log10(top_results$padj + 1e-300)  # Add small value to avoid log(0)
+
+          barplots_celltype[[as.character(clust)]] <- ggplot(top_results,
+                                                             aes(x = reorder(pathway, NES), y = NES, fill = neg_log10_padj)) +
+            geom_bar(stat = "identity") +
+            coord_flip() +
+            scale_fill_gradient(low = "tan1", high = "midnightblue", name = "-log10(padj)") +
+            labs(x = "Cell Type", y = "Normalized Enrichment Score (NES)",
+                 title = paste0(input$celltype_method, " cell type enrichment on ", input$celltype_db, " database in ", input$species, " : ", clust)) +
+            theme_minimal() +
+            theme(plot.title = element_text(size = 12, face = "bold"),
+                  axis.text.y = element_text(size = 10),
+                  axis.text.x = element_text(size = 10),
+                  axis.title.x = element_text(size = 12),
+                  axis.title.y = element_text(size = 12),
+                  panel.background = element_blank(),
+                  panel.grid.major = element_line(colour = "gray90")) +
+            scale_y_continuous(labels = function(x) stringr::str_wrap(x, width = 50))
+
         } else if (input$celltype_method == "Enrichr Web Query") {
           enrichment_output <- enrichR::enrichr(names(clust_ranks), databases = input$celltype_db)
           enrichment_results[[as.character(clust)]] <- enrichment_output[[1]] |>
             as.data.frame() |>
             dplyr::arrange(Adjusted.P.value)
-            
-          barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
-                                                             aes(x = reorder(Term, -Adjusted.P.value), y = Combined.Score, fill = Adjusted.P.value))
+
+          # Prepare top results with -log10(Adjusted.P.value) for visualization
+          top_results <- head(enrichment_results[[as.character(clust)]], 10)
+          top_results$neg_log10_padj <- -log10(top_results$Adjusted.P.value + 1e-300)
+
+          barplots_celltype[[as.character(clust)]] <- ggplot(top_results,
+                                                             aes(x = reorder(Term, Combined.Score), y = Combined.Score, fill = neg_log10_padj)) +
+            geom_bar(stat = "identity") +
+            coord_flip() +
+            scale_fill_gradient(low = "tan1", high = "midnightblue", name = "-log10(padj)") +
+            labs(x = "Cell Type", y = "Combined Score",
+                 title = paste0(input$celltype_method, " cell type enrichment on ", input$celltype_db, " database in ", input$species, " : ", clust)) +
+            theme_minimal() +
+            theme(plot.title = element_text(size = 12, face = "bold"),
+                  axis.text.y = element_text(size = 10),
+                  axis.text.x = element_text(size = 10),
+                  axis.title.x = element_text(size = 12),
+                  axis.title.y = element_text(size = 12),
+                  panel.background = element_blank(),
+                  panel.grid.major = element_line(colour = "gray90")) +
+            scale_y_continuous(labels = function(x) stringr::str_wrap(x, width = 50))
         }
-        
-        barplots_celltype[[as.character(clust)]] <- barplots_celltype[[as.character(clust)]] +
-          geom_bar(stat = "identity") +
-          coord_flip() +
-          scale_fill_gradient(low = "midnightblue", high = "tan1", name = "Adjusted p-value", limits = c(0, 1)) +
-          labs(x = "Cell Type", y = "Enrichment Score",
-               title = paste0(input$celltype_method, " cell type enrichment on ", input$celltype_db, " database in ", input$species, " : ", clust)) +
-          theme_minimal() +
-          theme(plot.title = element_text(size = 12, face = "bold"),
-                axis.text.y = element_text(size = 10),
-                axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
-                axis.title.x = element_text(size = 12),
-                axis.title.y = element_text(size = 12),
-                panel.background = element_blank(),
-                panel.grid.major = element_line(colour = "gray90")) +
-          scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 50))
       }
       
       output$fgsea_plots <- renderUI({
@@ -474,7 +497,23 @@ server <- function(input, output, session) {
             
             # Render the data table for the current cluster
             output[[paste0(input$celltype_method, "_table_", cluster_name)]] <- DT::renderDataTable({
-              enrichment_results[[cluster_name]]
+              table_data <- enrichment_results[[cluster_name]]
+
+              # Format numeric columns for display only (keep original data for download)
+              numeric_cols <- c("pval", "padj", "log2err", "ES", "NES", "P.value", "Adjusted.P.value")
+              for (col in numeric_cols) {
+                if (col %in% colnames(table_data)) {
+                  table_data[[col]] <- sapply(table_data[[col]], function(x) {
+                    if (is.numeric(x)) {
+                      formatC(x, format = "e", digits = 3)
+                    } else {
+                      x
+                    }
+                  })
+                }
+              }
+
+              DT::datatable(table_data, options = list(pageLength = 10))
             })
           })
         }
@@ -524,6 +563,21 @@ server <- function(input, output, session) {
       incProgress(0.1, detail = "Rendering Data table")
       output$pathway_results <- DT::renderDataTable({
         resultDt <- as.data.frame(result)
+
+        # Format numeric columns for display (max 3 decimals with scientific notation)
+        numeric_cols <- c("pvalue", "p.adjust", "qvalue", "NES", "pval", "padj", "qvalues")
+        for (col in numeric_cols) {
+          if (col %in% colnames(resultDt)) {
+            resultDt[[col]] <- sapply(resultDt[[col]], function(x) {
+              if (is.numeric(x)) {
+                formatC(x, format = "e", digits = 3)
+              } else {
+                x
+              }
+            })
+          }
+        }
+
         DT::datatable(resultDt, options = list(pageLength = 20))
       })
       

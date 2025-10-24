@@ -185,34 +185,34 @@ convertGeneMap <- function(genes, mart, species){
 
 runPathwayAnalysis <- function(genes, method, database, species, mart) {
   incProgress(0.1, detail = "Running Pathway Analysis")
-  
+
   # Set gene symbol column based on species
   gene_symbol_col <- ifelse(tolower(species) == "mouse", "mgi_symbol", "hgnc_symbol")
-  
+
   # Convert genes to Ensembl/Entrez
   gene_map <- convertGeneMap(genes, mart, species)
   genes[[gene_symbol_col]] <- rownames(genes)
   genes <- merge(genes, gene_map, by.x = gene_symbol_col, by.y = gene_symbol_col)
-  
+
   # Set OrgDb for GO terms
   go_species <- switch(tolower(species),
                        human = "org.Hs.eg.db",
                        mouse = "org.Mm.eg.db",
                        stop("Unsupported species for GO analysis"))
-  
+
   # Prepare hallmark gene sets if needed
   if (database == "HALLMARK") {
     hallmark_gene_sets <- msigdbr(species = tolower(species), category = "H")
     hallmark_gene_list <- hallmark_gene_sets |>
       dplyr::select(gs_name, entrez_gene)
   }
-  
+
   # ORA method
   if (method == "ORA") {
     gene_list <- genes |>
       dplyr::filter(p_val_adj <= 0.05) |>
       dplyr::filter(avg_log2FC >= 0)
-    
+
     result <- switch(database,
                      GO = enrichGO(gene = gene_list$ensembl_gene_id,
                                    OrgDb = get(go_species),
@@ -229,18 +229,18 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
                                          pAdjustMethod = "BH",
                                          pvalueCutoff = 0.05),
                      stop("Unsupported database"))
-    
+
     # FGSEA method
   } else if (method == "FGSEA") {
     genes_sorted <- genes |>
       dplyr::arrange(desc(avg_log2FC)) |>
       dplyr::filter(!is.na(entrezgene_id))
-    
+
     ranks <- as.numeric(genes_sorted$avg_log2FC)
     names(ranks) <- genes_sorted$entrezgene_id
     ranks <- sort(ranks, decreasing = TRUE)
     ranks <- ranks[!duplicated(names(ranks))]
-    
+
     result <- switch(database,
                      GO = gseGO(geneList = ranks,
                                 OrgDb = get(go_species),
@@ -255,11 +255,49 @@ runPathwayAnalysis <- function(genes, method, database, species, mart) {
                                      TERM2GENE = hallmark_gene_list,
                                      pvalueCutoff = 1),
                      stop("Unsupported database"))
-    
+
   } else {
     stop("Unsupported method")
   }
-  
+
+  # Convert geneID from Entrez/ENSEMBL to common gene symbols
+  if (!is.null(result) && nrow(result@result) > 0) {
+    # Create case-insensitive lookup for gene symbols
+    gene_map_lower <- gene_map
+    gene_map_lower[[gene_symbol_col]] <- tolower(gene_map[[gene_symbol_col]])
+
+    result@result$geneID <- sapply(strsplit(as.character(result@result$geneID), "/"), function(gene_ids) {
+      # Convert each ID to gene symbol
+      converted <- sapply(gene_ids, function(id) {
+        original_id <- id  # Keep original ID in case we can't convert
+
+        # Try exact match first (Entrez or ENSEMBL)
+        match_row <- gene_map[gene_map$entrezgene_id == id | gene_map$ensembl_gene_id == id, ]
+
+        if (nrow(match_row) > 0 && !is.na(match_row[[gene_symbol_col]][1]) && match_row[[gene_symbol_col]][1] != "") {
+          return(as.character(match_row[[gene_symbol_col]][1]))
+        }
+
+        # Try case-insensitive match on gene symbol itself (in case ID is already a symbol)
+        id_lower <- tolower(id)
+        match_row_lower <- gene_map_lower[tolower(gene_map_lower[[gene_symbol_col]]) == id_lower, ]
+
+        if (nrow(match_row_lower) > 0 && !is.na(gene_map[[gene_symbol_col]][match_row_lower[1, ]]) && gene_map[[gene_symbol_col]][match_row_lower[1, ]] != "") {
+          return(as.character(gene_map[[gene_symbol_col]][which(tolower(gene_map[[gene_symbol_col]]) == id_lower)[1]]))
+        }
+
+        # If all else fails, return the original ID (better than NA)
+        return(original_id)
+      })
+      paste(converted, collapse = "/")
+    })
+
+    # Remove ID column as it's redundant with rownames
+    if ("ID" %in% colnames(result@result)) {
+      result@result <- result@result[, !colnames(result@result) %in% "ID"]
+    }
+  }
+
   return(result)
 }
 
