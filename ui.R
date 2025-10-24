@@ -1,16 +1,18 @@
 if (!require("BiocManager")) install.packages("BiocManager", quiet = TRUE)
 if (!require("devtools")) install.packages("devtools", quiet = TRUE)
 if (!require("pacman")) install.packages("pacman", quiet = TRUE)
-if (!require("enrichR")) install_github("wjawaid/enrichR")
-if (!require("presto")) install_github("immunogenomics/presto")
-if (!require("ggheatmapper")) install_github("csgroen/ggheatmapper")
+if (!require("enrichR")) remotes::install_github("wjawaid/enrichR")
+if (!require("presto")) remotes::install_github("immunogenomics/presto")
+if (!require("ggheatmapper")) remotes::install_github("csgroen/ggheatmapper")
+
+options(shiny.maxRequestSize=100*1024^2)
 
 pacman::p_load(shiny, shinydashboard, ggplot2, shinyWidgets, dplyr, ggbeeswarm,
                Seurat, reshape2, ggpubr, ggheatmapper, viridis, clusterProfiler,
-               org.Hs.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl, devtools,
-               enrichR, callr, shinyjs, gtools, WriteXLS)
+               org.Hs.eg.db, org.Mm.eg.db, biomaRt, fgsea, msigdbr, tidyverse, readxl, devtools,
+               enrichR, callr, shinyjs, gtools, WriteXLS, harmony)
 
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+# setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 ui <- dashboardPage(
   dashboardHeader(title = "cLoupeComplement"),
@@ -41,11 +43,12 @@ ui <- dashboardPage(
 
             fluidRow(
               column(6,
-                     textInput("cellranger_out", "Enter CellRanger Output Folder Path", 
-                               placeholder = "/path/to/cellranger/outs")
+                     fileInput("h5_file", "Upload filtered_feature_bc_matrix.h5 file (max 100MB)",
+                               accept = c(".h5", ".hdf5"), placeholder = "No file selected"),
+                     helpText("For Visium HD: use binned_outputs/square_008um/filtered_feature_bc_matrix.h5")
               ),
-              column(6, 
-                     fileInput("cluster_csv", "Choose Cluster CSV File", 
+              column(6,
+                     fileInput("cluster_csv", "Choose Cluster CSV File (max 100MB)",
                                accept = ".csv", placeholder = "No file selected")
               )
             )
@@ -67,16 +70,55 @@ ui <- dashboardPage(
                         choices = c("LogNormalize", "SCTransform"),
                         selected = "LogNormalize"),
             numericInput("gene_expression_cutoff",
-                         "Minimum % of cells expressing gene:", 
+                         "Minimum % of cells expressing gene:",
                          value = 1, min = 0, max = 100, step = 1),
             numericInput("spot_gene_cutoff",
-                         "Minimum number of genes expressed per spot:", 
-                         value = 100, min = 0, step = 10)
+                         "Minimum number of genes expressed per spot:",
+                         value = 100, min = 0, step = 10),
+
+            # Visium HD options
+            checkboxInput("is_visium_hd", "Visium HD Dataset (Use Sketching)", value = FALSE),
+            conditionalPanel(
+              condition = "input.is_visium_hd == true",
+              numericInput("sketch_size",
+                           "Number of spots to sketch (for memory optimization):",
+                           value = 5000, min = 1000, max = 50000, step = 1000),
+              helpText("Sketching randomly samples spots to reduce memory usage for large Visium HD datasets. 5,000-10,000 spots typically provides good balance between performance and quality.")
+            )
           )
         ),
         actionButton("load_data", "Load Data"),
         br(),
         verbatimTextOutput("data_info"),
+
+        # Info box for Visium HD sketching
+        conditionalPanel(
+          condition = "input.is_visium_hd == true",
+          fluidRow(
+            box(
+              width = 12,
+              title = "Visium HD Sketching Information",
+              solidHeader = TRUE,
+              status = "info",
+              collapsible = TRUE,
+              collapsed = TRUE,
+
+              HTML("<p><strong>Operations using SKETCHED data (faster, memory efficient):</strong></p>
+                   <ul>
+                     <li>Violin & Beeswarm plots</li>
+                     <li>Heatmaps</li>
+                     <li>DotPlots</li>
+                     <li>Data visualization and exploration</li>
+                   </ul>
+                   <p><strong>Operations using FULL data (accurate, slower):</strong></p>
+                   <ul>
+                     <li>Differential expression analysis (FindAllMarkers)</li>
+                     <li>Statistical testing</li>
+                   </ul>
+                   <p><em>This approach ensures visualizations are responsive while maintaining statistical accuracy for differential expression.</em></p>")
+            )
+          )
+        ),
         
         fluidRow(
           box(
@@ -191,15 +233,38 @@ ui <- dashboardPage(
               
               tags$script(HTML("
       Shiny.addCustomMessageHandler('enhanceSelectize', function(inputId) {
-        var selectize = $('#' + inputId).selectize()[0].selectize;
-        
+        var $select = $('#' + inputId);
+        var selectize = $select[0].selectize;
+
         if (selectize) {
-          selectize.onPaste = function(e) {
-            var pastedData = (e.originalEvent || e).clipboardData.getData('text');
-            var genes = pastedData.split(/[\\s,]+/).filter(Boolean);
-            selectize.addItems(genes);
+          // Remove any existing paste handler
+          selectize.$control_input.off('paste');
+
+          // Add paste event handler
+          selectize.$control_input.on('paste', function(e) {
             e.preventDefault();
-          };
+            var pastedData = (e.originalEvent || e).clipboardData.getData('text/plain');
+
+            // Split by newlines, commas, semicolons, or spaces
+            var genes = pastedData.split(/[\\n\\r,;\\s]+/).filter(function(item) {
+              return item.trim().length > 0;
+            });
+
+            // Add each gene as an item
+            genes.forEach(function(gene) {
+              var trimmedGene = gene.trim();
+              // Check if the gene exists in available options
+              if (selectize.options[trimmedGene]) {
+                selectize.addItem(trimmedGene, true);
+              } else {
+                // Try to add it anyway (will work if server-side selectize allows it)
+                selectize.addOption({value: trimmedGene, text: trimmedGene});
+                selectize.addItem(trimmedGene, true);
+              }
+            });
+
+            selectize.refreshOptions(false);
+          });
         }
       });
     ")),

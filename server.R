@@ -4,7 +4,12 @@ server <- function(input, output, session) {
   disable("use_custom_diffexp")
   
   # Reactive values for loaded data and comparisons
-  data_loaded <- reactiveValues(seuratObj = NULL, clusterMat = NULL)
+  data_loaded <- reactiveValues(
+    seuratObj = NULL,
+    seuratObj_full = NULL,  # Full object for differential expression (if sketched)
+    clusterMat = NULL,
+    is_sketched = FALSE
+  )
   comparisons <- reactiveVal(list())
   diffexp_all <- reactiveVal(NULL)
   diffexp_results <- reactiveVal(NULL)
@@ -16,47 +21,69 @@ server <- function(input, output, session) {
 
   # Event to load data when the user clicks the load button
   observeEvent(input$load_data, {
-    req(input$cellranger_out, input$cluster_csv, input$gene_expression_cutoff,
+    req(input$h5_file, input$cluster_csv, input$gene_expression_cutoff,
         input$spot_gene_cutoff, input$species, input$normalisation_method)
-    
-    folderCellRangerOut <- input$cellranger_out
+
+    h5FilePath <- input$h5_file$datapath
     filenameCluster <- input$cluster_csv$datapath
-    
-    filter_results <- loadAndPreprocess(folderCellRangerOut, input$gene_expression_cutoff,
+
+    # Get Visium HD parameters
+    is_visium_hd <- isTRUE(input$is_visium_hd)
+    sketch_size <- ifelse(is_visium_hd, input$sketch_size, 5000)
+
+    filter_results <- loadAndPreprocess(h5FilePath, input$gene_expression_cutoff,
                                         input$spot_gene_cutoff, input$species,
-                                        input$normalisation_method)
+                                        input$normalisation_method,
+                                        is_visium_hd = is_visium_hd,
+                                        sketch_size = sketch_size)
     data_loaded$seuratObj <- filter_results$seuratObj
+    data_loaded$seuratObj_full <- filter_results$seuratObj_full
+    data_loaded$is_sketched <- filter_results$is_sketched
     data_loaded$mart <- filter_results$mart
     data_loaded$clusterMat <- loadClusterMat(filenameCluster, data_loaded$seuratObj)
     data_loaded$seuratObj[[]]["clusterMat"] <- data_loaded$clusterMat
-    
+
     Idents(data_loaded$seuratObj) <- data_loaded$seuratObj[[]]["clusterMat"][[1]]
-    
-    gene_expression_sums <- Matrix::rowSums(data_loaded$seuratObj[[Assays(data_loaded$seuratObj)]]$counts)
+
+    gene_expression_sums <- Matrix::rowSums(data_loaded$seuratObj[[DefaultAssay(data_loaded$seuratObj)]]$counts)
     ordered_genes <- names(sort(gene_expression_sums, decreasing = TRUE))
-    
+
     sorted_clusters <- sort(unique(data_loaded$clusterMat[,1]))
 
     updateSelectizeInput(session, "gene_select", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "gene_select_dotplot", choices = ordered_genes, server = TRUE)
     updateSelectizeInput(session, "comparison_select", choices = sorted_clusters, server = TRUE)
     updateSelectizeInput(session, "selected_cluster", choices = sorted_clusters, selected = sorted_clusters[1])
-    
-    observe({
-      session$sendCustomMessage("enhanceSelectize", "gene_select_dotplot")
-    })
-    
+
+    # Enable clipboard paste functionality for the dotplot gene selector
+    session$sendCustomMessage("enhanceSelectize", "gene_select_dotplot")
+
     # Update the filtered out information
     output$data_info <- renderPrint({
       cat("Seurat Object Dimensions:", dim(data_loaded$seuratObj), "\n")
       cat("Cluster Matrix Dimensions:", dim(data_loaded$clusterMat), "\n")
       cat("Filtered out genes:", filter_results$filtered_genes, "\n")
       cat("Filtered out spots:", filter_results$filtered_spots, "\n")
+      if (data_loaded$is_sketched) {
+        cat("Dataset is sketched for visualization (", ncol(data_loaded$seuratObj),
+            " spots from ", ncol(data_loaded$seuratObj_full), " total)\n", sep = "")
+      }
     })
-    
+
     # Pre-calculate diffexp results while user is busy looking at something else
-    process <- callr::r_bg(FindAllMarkers, 
-      args = list(data_loaded$seuratObj),
+    # Use full object if available (for Visium HD), otherwise use the main object
+    diffexp_obj <- if (!is.null(data_loaded$seuratObj_full)) {
+      # Need to load cluster info for full object
+      clusterMat_full <- loadClusterMat(filenameCluster, data_loaded$seuratObj_full)
+      data_loaded$seuratObj_full[[]]["clusterMat"] <- clusterMat_full
+      Idents(data_loaded$seuratObj_full) <- data_loaded$seuratObj_full[[]]["clusterMat"][[1]]
+      data_loaded$seuratObj_full
+    } else {
+      data_loaded$seuratObj
+    }
+
+    process <- callr::r_bg(FindAllMarkers,
+      args = list(diffexp_obj),
       package = "Seurat")
     diffexp_status(process)
   })
@@ -188,13 +215,13 @@ server <- function(input, output, session) {
       genes <- input$gene_select_dotplot
       gexp <- GetAssayData(data_loaded$seuratObj, slot = "scale.data")[genes, , drop = FALSE]
       
-      sample_annot <- data_loaded$seuratObj[[]] %>% rownames_to_column("sample")
+      sample_annot <- data_loaded$seuratObj[[]] %>% rownames_to_column("spots")
       
       incProgress(0.3, detail = "Processing data")
       
       dataHm <- as.data.frame(t(gexp)) %>%
-        rownames_to_column("sample") %>%
-        left_join(sample_annot, by = "sample") %>%
+        rownames_to_column("spots") %>%
+        left_join(sample_annot, by = "spots") %>%
         tibble() %>%
         group_by(clusterMat)
       
@@ -204,17 +231,18 @@ server <- function(input, output, session) {
       incProgress(0.2, detail = "Generating heatmap")
       
       hmplot <- ggheatmap(dataHm,
-                          colv = "sample",
+                          colv = "spots",
                           rowv = genes,
                           hm_colors = "RdBu",
                           scale = TRUE,
-                          center = TRUE, 
+                          center = TRUE,
                           hm_color_limits = c(-color_limit, color_limit),
                           show_dend_col = FALSE,
                           show_dend_row = FALSE,
                           show_colnames = FALSE,
                           show_rownames = TRUE,
-                          colors_title = "Scaled expression (log2 UQ)") +
+                          colors_title = "Scaled expression (log2 UQ)",
+                          raster = TRUE) +
         plot_layout(guides = 'collect')
       
       incProgress(0.3, detail = "Done")
@@ -297,32 +325,37 @@ server <- function(input, output, session) {
     selected_cluster <- input$selected_cluster
     
     if (!is.null(diffexp_all())) {
-      diffexp <- diffexp_all() |>
-        filter(str_detect(cluster, selected_cluster)) |>
+      raw_diffexp <- diffexp_all() |>
+        filter(cluster == selected_cluster) |>
         dplyr::select(-contains("cluster"))
       
-      if ("gene" %in% colnames(diffexp)) {
-        rownames(diffexp) <- diffexp$gene
+      if ("gene" %in% colnames(raw_diffexp)) {
+        rownames(raw_diffexp) <- as.character(raw_diffexp$gene)
       } else {
         warning("The 'gene' column is missing in the differential expression results.")
       }
       
-      if ("p_val" %in% colnames(diffexp)) {
-        diffexp$p_val <- format_pval(diffexp$p_val)
-      }
-      if ("p_val_adj" %in% colnames(diffexp)) {
-        diffexp$p_val_adj <- format_pval(diffexp$p_val_adj)
-      }
-      if ("avg_log2FC" %in% colnames(diffexp)) {
-        diffexp$avg_log2FC <- format_pval(diffexp$avg_log2FC)
-      }
-      
-      diffexp_results(diffexp)
+      # Store unformatted version
+      diffexp_results(raw_diffexp)
       
       output$diffexp_table <- DT::renderDataTable({
-        diffexp_display <- diffexp_results() |> 
+        # Create a copy for display formatting
+        diffexp_display <- raw_diffexp
+        
+        if ("p_val" %in% colnames(diffexp_display)) {
+          diffexp_display$p_val <- format_pval(diffexp_display$p_val)
+        }
+        if ("p_val_adj" %in% colnames(diffexp_display)) {
+          diffexp_display$p_val_adj <- format_pval(diffexp_display$p_val_adj)
+        }
+        if ("avg_log2FC" %in% colnames(diffexp_display)) {
+          diffexp_display$avg_log2FC <- format_pval(diffexp_display$avg_log2FC)
+        }
+        
+        diffexp_display <- diffexp_display |> 
           dplyr::select(-gene) |> 
-          dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
+          dplyr::rename("Proportion Expressed in Cluster" = pct.1, 
+                        "Proportion Expressed in Others" = pct.2)
         
         DT::datatable(diffexp_display, options = list(pageLength = 10, autoWidth = TRUE))
       })
@@ -336,7 +369,7 @@ server <- function(input, output, session) {
     content = function(file) {
       diffexp_export <- diffexp_results() |> 
         dplyr::select(-gene) |> 
-        dplyr::rename("% Expressed in Cluster" = pct.1, "% Expressed in Others" = pct.2)
+        dplyr::rename("Proportion Expressed in Cluster" = pct.1, "Proportion Expressed in Others" = pct.2)
       
       write.csv(diffexp_export, file, row.names = FALSE)
     }
@@ -392,7 +425,7 @@ server <- function(input, output, session) {
       
       # Number of clusters for progress calculation
       total_clusters <- length(unique(genes_sorted$cluster))
-      cluster_progress_step <- 1 / total_clusters  # Calculate progress step per cluster
+      cluster_progress_step <- 1 / total_clusters
       
       for (clust in sort(unique(genes_sorted$cluster))) {
         # Update progress for each cluster iteration
@@ -408,33 +441,55 @@ server <- function(input, output, session) {
             as.data.frame() |>
             dplyr::filter(NES >= 0) |>
             dplyr::arrange(padj)
-          barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
-                                                             aes(x = reorder(pathway, -padj), y = NES, fill = padj))
+
+          # Prepare top results with -log10(padj) for visualization
+          top_results <- head(enrichment_results[[as.character(clust)]], 10)
+          top_results$neg_log10_padj <- -log10(top_results$padj + 1e-300)  # Add small value to avoid log(0)
+
+          barplots_celltype[[as.character(clust)]] <- ggplot(top_results,
+                                                             aes(x = reorder(pathway, NES), y = NES, fill = neg_log10_padj)) +
+            geom_bar(stat = "identity") +
+            coord_flip() +
+            scale_fill_gradient(low = "tan1", high = "midnightblue", name = "-log10(padj)") +
+            labs(x = "Cell Type", y = "Normalized Enrichment Score (NES)",
+                 title = paste0(input$celltype_method, " cell type enrichment on ", input$celltype_db, " database in ", input$species, " : ", clust)) +
+            theme_minimal() +
+            theme(plot.title = element_text(size = 12, face = "bold"),
+                  axis.text.y = element_text(size = 10),
+                  axis.text.x = element_text(size = 10),
+                  axis.title.x = element_text(size = 12),
+                  axis.title.y = element_text(size = 12),
+                  panel.background = element_blank(),
+                  panel.grid.major = element_line(colour = "gray90")) +
+            scale_y_continuous(labels = function(x) stringr::str_wrap(x, width = 50))
+
         } else if (input$celltype_method == "Enrichr Web Query") {
           enrichment_output <- enrichR::enrichr(names(clust_ranks), databases = input$celltype_db)
           enrichment_results[[as.character(clust)]] <- enrichment_output[[1]] |>
             as.data.frame() |>
             dplyr::arrange(Adjusted.P.value)
-            
-          barplots_celltype[[as.character(clust)]] <- ggplot(head(enrichment_results[[as.character(clust)]], 10), 
-                                                             aes(x = reorder(Term, -Adjusted.P.value), y = Combined.Score, fill = Adjusted.P.value))
+
+          # Prepare top results with -log10(Adjusted.P.value) for visualization
+          top_results <- head(enrichment_results[[as.character(clust)]], 10)
+          top_results$neg_log10_padj <- -log10(top_results$Adjusted.P.value + 1e-300)
+
+          barplots_celltype[[as.character(clust)]] <- ggplot(top_results,
+                                                             aes(x = reorder(Term, Combined.Score), y = Combined.Score, fill = neg_log10_padj)) +
+            geom_bar(stat = "identity") +
+            coord_flip() +
+            scale_fill_gradient(low = "tan1", high = "midnightblue", name = "-log10(padj)") +
+            labs(x = "Cell Type", y = "Combined Score",
+                 title = paste0(input$celltype_method, " cell type enrichment on ", input$celltype_db, " database in ", input$species, " : ", clust)) +
+            theme_minimal() +
+            theme(plot.title = element_text(size = 12, face = "bold"),
+                  axis.text.y = element_text(size = 10),
+                  axis.text.x = element_text(size = 10),
+                  axis.title.x = element_text(size = 12),
+                  axis.title.y = element_text(size = 12),
+                  panel.background = element_blank(),
+                  panel.grid.major = element_line(colour = "gray90")) +
+            scale_y_continuous(labels = function(x) stringr::str_wrap(x, width = 50))
         }
-        
-        barplots_celltype[[as.character(clust)]] <- barplots_celltype[[as.character(clust)]] +
-          geom_bar(stat = "identity") +
-          coord_flip() +
-          scale_fill_gradient(low = "midnightblue", high = "tan1", name = "Adjusted p-value", limits = c(0, 1)) +
-          labs(x = "Cell Type", y = "Enrichment Score",
-               title = paste0(input$celltype_method, " cell type enrichment on ", input$celltype_db, " database in ", input$species, " : ", clust)) +
-          theme_minimal() +
-          theme(plot.title = element_text(size = 12, face = "bold"),
-                axis.text.y = element_text(size = 10),
-                axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
-                axis.title.x = element_text(size = 12),
-                axis.title.y = element_text(size = 12),
-                panel.background = element_blank(),
-                panel.grid.major = element_line(colour = "gray90")) +
-          scale_y_discrete(labels = function(x) stringr::str_wrap(x, width = 50))
       }
       
       output$fgsea_plots <- renderUI({
@@ -470,7 +525,23 @@ server <- function(input, output, session) {
             
             # Render the data table for the current cluster
             output[[paste0(input$celltype_method, "_table_", cluster_name)]] <- DT::renderDataTable({
-              enrichment_results[[cluster_name]]
+              table_data <- enrichment_results[[cluster_name]]
+
+              # Format numeric columns for display only (keep original data for download)
+              numeric_cols <- c("pval", "padj", "log2err", "ES", "NES", "P.value", "Adjusted.P.value")
+              for (col in numeric_cols) {
+                if (col %in% colnames(table_data)) {
+                  table_data[[col]] <- sapply(table_data[[col]], function(x) {
+                    if (is.numeric(x)) {
+                      formatC(x, format = "e", digits = 3)
+                    } else {
+                      x
+                    }
+                  })
+                }
+              }
+
+              DT::datatable(table_data, options = list(pageLength = 10))
             })
           })
         }
@@ -520,6 +591,21 @@ server <- function(input, output, session) {
       incProgress(0.1, detail = "Rendering Data table")
       output$pathway_results <- DT::renderDataTable({
         resultDt <- as.data.frame(result)
+
+        # Format numeric columns for display (max 3 decimals with scientific notation)
+        numeric_cols <- c("pvalue", "p.adjust", "qvalue", "NES", "pval", "padj", "qvalues")
+        for (col in numeric_cols) {
+          if (col %in% colnames(resultDt)) {
+            resultDt[[col]] <- sapply(resultDt[[col]], function(x) {
+              if (is.numeric(x)) {
+                formatC(x, format = "e", digits = 3)
+              } else {
+                x
+              }
+            })
+          }
+        }
+
         DT::datatable(resultDt, options = list(pageLength = 20))
       })
       
