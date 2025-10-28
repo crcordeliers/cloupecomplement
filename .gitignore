@@ -3,3 +3,4 @@ cloupecomplement.Rproj
 .Rproj.user
 seuratObj.RDS
 /renv
+docker/cloupecomplement-docker-image.tar.gz
