@@ -1,0 +1,16 @@
+.git
+.gitignore
+.Rproj.user
+docker
+.Rprofile
+.Rhistory
+cloupecomplement.Rproj
+# Exclude launchers and build scripts from image
+*.bat
+*.command
+*.sh
+# Exclude docs
+docs/
+# Only include src/ and docker_build/ in the image
+!src/
+!docker_build/
