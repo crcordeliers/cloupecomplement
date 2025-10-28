@@ -1,11 +1,5 @@
 cloupecomplement.Rproj
 .Rhistory
-/data/K-Means 7.csv
-/data/outs/
 .Rproj.user
 seuratObj.RDS
 /renv
-renv.lock
-dockerfile
-docker/openApp.sh
-.dockerignore
