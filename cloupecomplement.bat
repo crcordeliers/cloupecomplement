@@ -20,6 +20,37 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+REM Check if image exists
+docker image inspect %IMAGE% >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Docker image '%IMAGE%' not found.
+    echo.
+
+    REM Check if pre-built image tar.gz exists
+    if exist "docker\cloupecomplement-docker-image.tar.gz" (
+        echo Found pre-built image file. Loading...
+        echo This may take a few minutes...
+        echo.
+        gunzip -c docker\cloupecomplement-docker-image.tar.gz | docker load
+        if %errorlevel% equ 0 (
+            echo Image loaded successfully!
+            echo.
+        ) else (
+            echo ERROR: Failed to load image from tar.gz
+            echo The image file may be corrupted.
+            echo.
+            pause
+            exit /b 1
+        )
+    ) else (
+        echo ERROR: Docker image file not found!
+        echo Please ensure 'docker\cloupecomplement-docker-image.tar.gz' exists.
+        echo.
+        pause
+        exit /b 1
+    )
+)
+
 echo Stopping any existing containers...
 for /f "tokens=*" %%i in ('docker ps -q --filter ancestor=%IMAGE%') do docker stop %%i >nul 2>&1
 

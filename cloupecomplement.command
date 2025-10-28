@@ -20,6 +20,36 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
+# Check if image exists
+if ! docker image inspect $IMAGE > /dev/null 2>&1; then
+    echo "Docker image '$IMAGE' not found."
+    echo ""
+
+    # Check if pre-built image tar.gz exists
+    if [ -f "docker/cloupecomplement-docker-image.tar.gz" ]; then
+        echo "Found pre-built image file. Loading..."
+        echo "This may take a few minutes..."
+        echo ""
+        gunzip -c docker/cloupecomplement-docker-image.tar.gz | docker load
+        if [ $? -eq 0 ]; then
+            echo "Image loaded successfully!"
+            echo ""
+        else
+            echo "ERROR: Failed to load image from tar.gz"
+            echo "The image file may be corrupted."
+            echo ""
+            read -p "Press Enter to exit..."
+            exit 1
+        fi
+    else
+        echo "ERROR: Docker image file not found!"
+        echo "Please ensure 'docker/cloupecomplement-docker-image.tar.gz' exists."
+        echo ""
+        read -p "Press Enter to exit..."
+        exit 1
+    fi
+fi
+
 echo "Stopping any existing containers..."
 docker ps -q --filter ancestor=$IMAGE | xargs -r docker stop > /dev/null 2>&1
 
