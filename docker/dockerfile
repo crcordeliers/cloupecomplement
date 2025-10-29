@@ -1,0 +1,66 @@
+# Use the official R image
+FROM rocker/r-ver:4.3.2
+
+# Install g++-14 and dependencies
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository ppa:ubuntu-toolchain-r/test && apt-get update && apt-get install -y \
+    g++-14 \
+    build-essential \
+    gfortran \
+    libgsl-dev \
+    libz-dev \
+    zlib1g-dev \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libbz2-dev \
+    libfreetype6-dev \
+    libfontconfig1-dev \
+    pkg-config \
+    cmake \
+    libharfbuzz-dev \
+    libfribidi-dev \
+    libtiff5-dev \
+    libhdf5-dev \
+    hdf5-tools \
+    wget \
+    gdebi-core \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set C++14 for R packages
+RUN echo 'CXX14 = g++' >> /usr/local/lib/R/etc/Makeconf && \
+    echo 'CXX14STD = -std=c++14' >> /usr/local/lib/R/etc/Makeconf
+
+# Install Shiny and Shiny Server
+RUN R -e "install.packages('shiny', repos='https://cloud.r-project.org')"
+
+RUN wget https://download3.rstudio.org/ubuntu-20.04/x86_64/shiny-server-1.5.23.1030-amd64.deb && \
+    gdebi shiny-server-1.5.23.1030-amd64.deb && \
+    rm shiny-server-1.5.23.1030-amd64.deb
+
+# Install remotes and Bioconductor dependencies
+RUN R -e "install.packages('remotes')"
+RUN R -e "install.packages('hdf5r')"
+RUN R -e "install.packages('BiocManager'); BiocManager::install('org.Hs.eg.db', ask=FALSE); BiocManager::install('org.Mm.eg.db', ask=FALSE); BiocManager::install('fgsea', ask=FALSE)"
+
+# Set working directory
+WORKDIR /srv/shiny-server
+
+# Copy only renv.lock first for better layer caching
+COPY docker/renv.lock ./
+
+# Restore R environment and install custom packages (this layer will be cached)
+RUN R -e "install.packages('renv'); renv::restore()"
+
+# Copy app source files AFTER installing packages (so code changes don't trigger package reinstall)
+COPY src/ /srv/shiny-server/
+
+# Expose the Shiny app port
+EXPOSE 3838
+
+# Run the app
+CMD ["R", "-e", "shiny::runApp('/srv/shiny-server', host = '0.0.0.0', port = 3838)"]
+

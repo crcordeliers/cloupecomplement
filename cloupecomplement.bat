@@ -2,7 +2,8 @@
 REM cLoupeComplement launcher for Windows
 REM Requirements: Docker Desktop must be installed and running
 
-set IMAGE=cloupecomplement
+set IMAGE=nicolasalaun/cloupecomplement:latest
+set IMAGE_NAME=nicolasalaun/cloupecomplement
 
 echo.
 echo ========================================
@@ -18,6 +19,30 @@ if %errorlevel% neq 0 (
     echo.
     pause
     exit /b 1
+)
+
+REM Check if image exists
+docker image inspect %IMAGE% >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Docker image not found locally.
+    echo Downloading from Docker Hub...
+    echo This may take several minutes (image size: ~2GB compressed)...
+    echo.
+
+    docker pull %IMAGE%
+
+    if %errorlevel% equ 0 (
+        echo.
+        echo Image downloaded successfully!
+        echo.
+    ) else (
+        echo.
+        echo ERROR: Failed to download image from Docker Hub
+        echo Please check your internet connection and try again.
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
 echo Stopping any existing containers...

@@ -12,13 +12,25 @@ This document explains how to launch cLoupeComplement on different operating sys
 
 ## Building the Docker Image (First Time Only)
 
-Before launching the app for the first time, you need to build the Docker image:
+Before launching the app for the first time, you need to build the Docker image. This takes 15-25 minutes but only needs to be done once.
 
+### Windows
+Double-click `build.bat`
+
+### macOS
+Right-click `build.command` and select "Open" (or run `./build.command` in Terminal)
+
+### Linux
+Run in terminal:
 ```bash
-docker build -t cloupecomplement .
+./build.sh
 ```
 
-This will take 15-25 minutes the first time. You only need to do this once (or when the code is updated).
+The build scripts will:
+- Check if Docker is running
+- Check if the image already exists (to avoid rebuilding unnecessarily)
+- Build the image if needed
+- Show you when it's ready to use
 
 ## Launching the App
 
