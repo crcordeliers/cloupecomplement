@@ -3,7 +3,8 @@
 # cLoupeComplement launcher for macOS
 # Requirements: Docker Desktop must be installed and running
 
-IMAGE="cloupecomplement"
+IMAGE="nicolasalaun/cloupecomplement:latest"
+IMAGE_NAME="nicolasalaun/cloupecomplement"
 
 echo ""
 echo "========================================"
@@ -22,28 +23,21 @@ fi
 
 # Check if image exists
 if ! docker image inspect $IMAGE > /dev/null 2>&1; then
-    echo "Docker image '$IMAGE' not found."
+    echo "Docker image not found locally."
+    echo "Downloading from Docker Hub..."
+    echo "This may take several minutes (image size: ~2GB compressed)..."
     echo ""
 
-    # Check if pre-built image tar.gz exists
-    if [ -f "docker/cloupecomplement-docker-image.tar.gz" ]; then
-        echo "Found pre-built image file. Loading..."
-        echo "This may take a few minutes..."
+    docker pull $IMAGE
+
+    if [ $? -eq 0 ]; then
         echo ""
-        gunzip -c docker/cloupecomplement-docker-image.tar.gz | docker load
-        if [ $? -eq 0 ]; then
-            echo "Image loaded successfully!"
-            echo ""
-        else
-            echo "ERROR: Failed to load image from tar.gz"
-            echo "The image file may be corrupted."
-            echo ""
-            read -p "Press Enter to exit..."
-            exit 1
-        fi
+        echo "Image downloaded successfully!"
+        echo ""
     else
-        echo "ERROR: Docker image file not found!"
-        echo "Please ensure 'docker/cloupecomplement-docker-image.tar.gz' exists."
+        echo ""
+        echo "ERROR: Failed to download image from Docker Hub"
+        echo "Please check your internet connection and try again."
         echo ""
         read -p "Press Enter to exit..."
         exit 1
