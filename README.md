@@ -27,7 +27,7 @@ All R package dependencies are automatically included in the Docker image (no ma
 
 1. **Clone this repository:**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/crcordeliers/cloupecomplement.git
    cd cloupecomplement
    ```
 
